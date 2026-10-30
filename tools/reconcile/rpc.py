@@ -1,5 +1,7 @@
 """Credential-blind read-only JSON-RPC with a persistent conservative CU ledger."""
 import json
+import copy
+import uuid
 import http.client
 import os
 import time
@@ -30,10 +32,15 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
 
 
 class Rpc:
-    def __init__(self, store, budget=5_000_000, interval=0.5, transport=None):
+    def __init__(self, store, budget=5_000_000, interval=0.5, transport=None, run_budget=100_000):
         self.store, self.budget, self.interval = store, budget, interval
         self.ledger = store.get('checkpoints/rpc-usage.json',
                                 {'requests': 0, 'estimatedCU': 0, 'methods': {}, 'errors': {}, 'retries': 0})
+        if not 0 < budget <= 5_000_000 or run_budget <= 0:
+            raise EvidenceError('invalid RPC budget')
+        self.run_budget = run_budget
+        self.run_id = uuid.uuid4().hex
+        self.run_start = copy.deepcopy(self.ledger)
         self.transport = transport
         self._url = None
         self.last = 0
@@ -54,15 +61,33 @@ class Rpc:
 
     def save(self):
         self.store.put('checkpoints/rpc-usage.json', self.ledger)
+        run = self.run_usage()
+        self.store.put('checkpoints/rpc-run.json', run)
+        self.store.put('output/rpc-usage/runs/' + self.run_id + '.json', run)
+
+    def run_usage(self):
+        return {'id': self.run_id, 'ceilingCU': self.run_budget,
+                'cumulativeCeilingCU': self.budget,
+                'requests': self.ledger['requests'] - self.run_start['requests'],
+                'estimatedCU': self.ledger['estimatedCU'] - self.run_start['estimatedCU'],
+                'retries': self.ledger['retries'] - self.run_start['retries'],
+                'cumulativeRequests': self.ledger['requests'],
+                'cumulativeEstimatedCU': self.ledger['estimatedCU']}
+
+    def check_budget(self, cost):
+        if self.ledger['estimatedCU'] + cost > self.budget:
+            self.save()
+            raise BudgetExceeded('cumulative estimated CU ceiling reached; cache preserved')
+        if self.run_usage()['estimatedCU'] + cost > self.run_budget:
+            self.save()
+            raise BudgetExceeded('per-run estimated CU ceiling reached; cache preserved')
 
     def call(self, method, params, retries=2):
         if method not in WEIGHTS:
             raise EvidenceError('non-allowlisted RPC method refused')
         for attempt in range(retries + 1):
             weight = WEIGHTS[method]
-            if self.ledger['estimatedCU'] + weight > self.budget:
-                self.save()
-                raise BudgetExceeded('estimated CU ceiling reached; cache preserved')
+            self.check_budget(weight)
             time.sleep(max(0, self.interval - (time.monotonic() - self.last)))
             self.last = time.monotonic()
             self.ledger['requests'] += 1
@@ -140,8 +165,7 @@ class Rpc:
         if not 1 <= len(requests) <= 10 or any(m not in WEIGHTS for m, p in requests):
             raise EvidenceError('invalid read-only batch')
         cost = sum(WEIGHTS[m] for m, p in requests)
-        if self.ledger['estimatedCU'] + cost > self.budget:
-            raise BudgetExceeded('estimated CU ceiling reached; cache preserved')
+        self.check_budget(cost)
         time.sleep(max(0, len(requests) * self.interval - (time.monotonic() - self.last)))
         self.last = time.monotonic()
         payload = []
@@ -172,7 +196,7 @@ class Rpc:
                     output.append(r['result'])
             self.save()
             return output
-        except (RpcError, ValueError, KeyError, TypeError):
+        except (RpcError, ValueError, KeyError, TypeError, OSError, http.client.HTTPException):
             self.ledger['errors']['batch_rejected'] = self.ledger['errors'].get('batch_rejected', 0) + len(requests)
             self.save()
             raise RpcError('batch_rejected') from None

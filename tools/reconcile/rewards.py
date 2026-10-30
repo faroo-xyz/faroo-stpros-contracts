@@ -63,9 +63,13 @@ def collect_evidence(collector, snapshot, events, max_cases=32, max_new_traces=3
             grouped.setdefault(e['raw']['transactionHash'].lower(), []).append(e)
     out = store.get('cache/snapshots/reward-evidence.json', {})
     if out.get('snapshot') != snapshot:
-        out = {'snapshot': snapshot, 'cases': {}, 'balanceReads': {}, 'scope': 'Block-boundary native deltas and targeted traces; external source identity not certified'}
+        previous = collector.boundary['context'].get('reward-evidence', {}) if collector.boundary else {}
+        out = {'snapshot': snapshot, 'cases': dict(previous.get('cases', {})), 'balanceReads': dict(previous.get('balanceReads', {})), 'scope': 'Block-boundary native deltas and targeted traces; external source identity not certified'}
     new_traces = 0
-    for tx, rows in list(grouped.items())[:max_cases]:
+    candidates = [(tx, rows) for tx, rows in grouped.items()
+                  if (not collector.boundary or number(rows[0]['raw']['blockNumber']) > collector.boundary['snapshot']['number'])
+                  and not (out['cases'].get(tx, {}).get('complete') and out['cases'][tx].get('trace') == 'AVAILABLE')]
+    for tx, rows in candidates[:max_cases]:
         if tx in out['cases'] and out['cases'][tx].get('complete') and out['cases'][tx].get('trace') == 'AVAILABLE':
             continue
         block = number(rows[0]['raw']['blockNumber'])

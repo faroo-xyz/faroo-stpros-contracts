@@ -4,13 +4,17 @@ from tools.lib.keccak import keccak256
 from .inventory import CORE, IMPL_SLOT, STAKING, ZERO, number, scopes, decode, UPGRADE
 from .storage import EvidenceError, gaps, ordered
 from .rpc import RpcError, BudgetExceeded, WEIGHTS
+from . import incremental
 
 
 class Collector:
     def __init__(self, store, rpc, inv):
         self.store, self.rpc, self.inv = store, rpc, inv
+        incremental.recover_snapshot(store)
         self.headers = store.get('cache/snapshots/headers.json', {})
         self.validated_anchors = set()
+        self.boundary = None
+        self.boundary_checked = False
 
     def header(self, block, fresh=False):
         key = hex(block) if isinstance(block, int) else block
@@ -55,6 +59,8 @@ class Collector:
         rel = f'cache/{category}/{key}.json'
         old = self.store.get(rel)
         if old is not None:
+            if expected_hash and old.get('blockHash') != expected_hash:
+                raise EvidenceError('cached transaction block hash mismatch')
             return old
         result = self.rpc.call(method, params)
         if result is None:
@@ -74,9 +80,19 @@ class Collector:
         if number(self.rpc.call('eth_chainId', [])) != 1672:
             raise EvidenceError('wrong chainId; expected 1672')
         existing = self.store.get('checkpoints/snapshot.json')
+        previous_plan = self.store.get('checkpoints/plan.json', {})
+        self.boundary = incremental.load_boundary(self.store)
+        if advance and existing and not self.boundary:
+            self.boundary = incremental.bootstrap(self.store, previous_plan)
+        if self.boundary:
+            incremental.validate_boundary(self.store, self.boundary)
+            self.check_snapshot(self.boundary['snapshot'])
+            self.boundary_checked = True
         if existing:
             self.check_snapshot(existing)
-        if existing and not advance:
+        # A pending snapshot is resumed, even when --advance is repeated after interruption.
+        pending = self.boundary and existing and not incremental.same(existing, self.boundary['snapshot'])
+        if existing and (not advance or pending):
             snap = existing
         else:
             head = number(self.rpc.call('eth_blockNumber', []))
@@ -84,25 +100,45 @@ class Collector:
                 h = self.header('finalized', fresh=True)
                 finality = 'provider-finalized-tag'
             except RpcError:
+                if advance:
+                    raise EvidenceError('incremental advance requires a finalized block tag') from None
                 h = self.header(max(0, head - depth), fresh=True)
                 finality = f'lagged-{depth}-blocks; finality unverified'
             snap = {'number': number(h['number']), 'hash': h['hash'], 'finality': finality, 'observedHead': head}
             if existing and snap['number'] < existing['number']:
                 raise EvidenceError('snapshot cannot move backwards')
+            if existing and incremental.same(snap, existing):
+                snap = existing
             if existing and snap != existing:
                 self.store.archive_snapshot(existing)
             self.store.put('checkpoints/snapshot.json', snap)
-        previous_plan = self.store.get('checkpoints/plan.json', {})
+        if self.boundary and incremental.same(snap, self.boundary['snapshot']) and incremental.same(previous_plan.get('snapshot'), snap):
+            return previous_plan
         plan = {'snapshot': snap, 'startBlock': self.inv['start'], 'scopes': scopes(self.inv),
                 'capabilities': {}, 'initialChunk': chunk, 'identity': {}, 'status': 'PREFLIGHT'}
         if previous_plan.get('scopes'):
             plan['scopes'] = previous_plan['scopes']
             required = scopes(self.inv)
-            # The original fixed address scope remains stable after discovery.
             existing_labels = {s['label'] for s in plan['scopes']}
             plan['scopes'] += [s for s in required if s['label'] not in existing_labels]
         if 'rangeCeiling' in previous_plan:
-            plan['rangeCeiling'] = previous_plan['rangeCeiling']
+            plan['rangeCeiling'] = min(1000, previous_plan['rangeCeiling'])
+        if self.boundary:
+            # Existing capability evidence is historical, not a new-snapshot attestation.
+            plan['capabilities'] = previous_plan.get('capabilities', {})
+            plan['historicalBoundary'] = incremental.identity(self.boundary['snapshot'])
+            plan['effectiveChunk'] = min(1000, previous_plan.get('effectiveChunk', chunk))
+            plan['rangeCeiling'] = min(1000, plan.get('rangeCeiling', chunk))
+            plan['estimate'] = {'baseRequests': 0, 'baseCU': 0, 'note': 'Only uncovered intervals; current state and trace costs are additional.'}
+            for scope in plan['scopes']:
+                chunks = self.store.chunks(scope['id'])
+                for lo, hi in gaps([(m['startBlock'], m['endBlock']) for m, _ in chunks], scope['start'], snap['number']):
+                    n = (hi - lo + plan['rangeCeiling']) // plan['rangeCeiling']
+                    plan['estimate']['baseRequests'] += n * 2
+                    plan['estimate']['baseCU'] += n * 190
+            plan['status'] = 'PLANNED'
+            self.store.put('checkpoints/plan.json', plan)
+            return plan
         self.store.put('checkpoints/plan.json', plan)
         st = self.inv['addresses']['proxies']['StPROS'].lower()
         migration = self.inv['release']['upgradeTransaction']
@@ -120,7 +156,7 @@ class Collector:
                 plan['capabilities'][label] = exc.category
             self.store.put('checkpoints/plan.json', plan)
         # One bounded sample probes provider limits. On failure, shrink immediately.
-        size = min(chunk, snap['number'] - self.inv['start'] + 1)
+        size = min(1000, chunk, snap['number'] - self.inv['start'] + 1)
         while size > 0:
             try:
                 logs = self.rpc.call('eth_getLogs', [dict(plan['scopes'][0]['filter'],
@@ -163,20 +199,49 @@ class Collector:
             raise EvidenceError('wrong chainId; expected 1672')
         snap = plan['snapshot']
         self.check_snapshot(snap)
+        if plan.get('historicalBoundary'):
+            self.boundary = incremental.load_boundary(self.store, plan['historicalBoundary'])
+            if not self.boundary:
+                raise EvidenceError('missing finalized history seal')
+            if not self.boundary_checked:
+                incremental.validate_boundary(self.store, self.boundary)
+                self.check_snapshot(self.boundary['snapshot'])
+                self.boundary_checked = True
+            boundary = self.boundary['snapshot']
+            if snap['number'] < boundary['number']:
+                raise EvidenceError('snapshot precedes trusted boundary')
+            if snap['number'] > boundary['number']:
+                child = self.header(boundary['number'] + 1, fresh=True)
+                if child['parentHash'] != boundary['hash']:
+                    raise EvidenceError('REORG: new interval does not extend finalized history')
+        trusted = {s['id']: s for s in self.boundary['scopes']} if self.boundary else {}
         for scope in plan['scopes']:
             chunks = self.store.chunks(scope['id'])
             # Revalidate interval anchors, including empty intervals, before reuse.
-            anchors = {int(b) for meta, _ in chunks for b in meta['headers']}
+            covered_boundary = self.boundary['snapshot']['number'] if scope['id'] in trusted else -1
+            if scope['id'] in trusted:
+                old_scope = trusted[scope['id']]
+                if old_scope != scope or list(gaps([(m['startBlock'], m['endBlock']) for m, _ in chunks
+                        if m['endBlock'] <= covered_boundary], scope['start'], covered_boundary)):
+                    raise EvidenceError('sealed filter changed or historical coverage incomplete')
+            anchors = {int(b) for meta, rows in chunks if meta['endBlock'] > covered_boundary
+                       for b in list(meta['headers']) + [str(number(l['blockNumber'])) for l in rows]}
             self.headers_batch(anchors - self.validated_anchors, fresh=True)
             self.validated_anchors.update(anchors)
             for meta, logs in chunks:
+                if meta['endBlock'] > snap['number']:
+                    raise EvidenceError('chunk exceeds pinned snapshot')
                 self.validate_logs(logs, scope['filter'], meta['startBlock'], meta['endBlock'])
+                for log in logs:
+                    if self.headers.get(log['blockNumber'], {}).get('hash') != log['blockHash']:
+                        raise EvidenceError('cached log block hash mismatch')
                 for block, expected in meta['headers'].items():
                     if self.headers[hex(int(block))]['hash'] != expected:
                         raise EvidenceError('REORG: interval hash mismatch')
             missing = list(gaps([(m['startBlock'], m['endBlock']) for m, _ in chunks], scope['start'], snap['number']))
             size = plan.get('rangeCeiling', plan.get('effectiveChunk', plan['initialChunk']))
-            ceiling = plan.get('rangeCeiling', 50000)
+            ceiling = min(1000, plan.get('rangeCeiling', 1000))
+            size = min(size, ceiling)
             for lo, hi in missing:
                 cursor = lo
                 while cursor <= hi:
@@ -245,6 +310,11 @@ class Collector:
                 entry = self.inv['implementations'].get(implementation)
                 if not entry:
                     issues.append('Unknown deployed implementation ' + implementation)
+                    continue
+                prior = self.boundary['context'].get('identities', {}).get('entries', {}).get(addr, {}) if self.boundary else {}
+                historical = next((v for v in prior.get('verified', []) if v['implementation'] == implementation and v['at'] == at and v['runtimeKeccak'] == entry['runtimeKeccak']), None)
+                if historical and at < snap['number'] and prior.get('status') == 'PASS':
+                    verified.append(historical)
                     continue
                 code = self.rpc.call('eth_getCode', [implementation, hex(at)])
                 actual = keccak256(bytes.fromhex(code[2:]))
@@ -348,7 +418,7 @@ class Collector:
                 continue
             for field in fields[decoded['name']]:
                 addr = decoded['args'][field].lower()
-                if addr != ZERO and addr not in self.inv['targets']:
+                if addr != ZERO and addr not in self.inv['targets'] and addr not in discovered:
                     candidates[addr] = min(candidates.get(addr, 2**63), number(log['blockNumber']))
         if len(candidates) + len(discovered) > 64:
             raise EvidenceError('historical routing discovery exceeds 64-address bound')
@@ -415,9 +485,11 @@ class Collector:
 
     def transactions(self, logs, max_receipts=2000, max_traces=40):
         transactions = {}
+        grouped = {}
         migration = self.inv['release']['upgradeTransaction'].lower()
         for log in logs:
             transactions[log['transactionHash'].lower()] = log['blockHash']
+            grouped.setdefault(log['transactionHash'].lower(), []).append(log)
         priorities = {}
         critical_topics = {abi.event_topic(s) for s in ['TokenAmountUpdated(address,uint256,uint256)',
             'EmergencyWithdraw(address,address,uint256)', 'SlpPharosProxySet(address,address)',
@@ -438,7 +510,10 @@ class Collector:
         for tx in ordered_txs:
             has_receipt = self.store.get('cache/receipts/' + tx + '.json') is not None
             has_transaction = self.store.get('cache/receipts/' + tx + '-transaction.json') is not None
+            historical = self.boundary and max(number(l['blockNumber']) for l in grouped[tx]) <= self.boundary['snapshot']['number']
             if not has_receipt or not has_transaction:
+                if historical:
+                    continue
                 if new_receipts >= max_receipts:
                     continue
                 new_receipts += 1
@@ -448,7 +523,7 @@ class Collector:
                     raise EvidenceError('receipt inconsistent with successful logs')
                 self.cached_rpc('receipts', tx + '-transaction', 'eth_getTransactionByHash', [tx], transactions[tx])
                 # Check all known transaction logs, including missing logs inside the collected scope.
-                selected = [l for l in logs if l['transactionHash'].lower() == tx]
+                selected = grouped[tx]
                 for log in selected:
                     match = [x for x in receipt['logs'] if number(x['logIndex']) == number(log['logIndex'])]
                     if len(match) != 1 or any(match[0][k] != log[k] for k in ('address', 'topics', 'data', 'blockHash', 'transactionHash')):
@@ -471,7 +546,7 @@ class Collector:
             cached_trace = self.store.get('cache/traces/' + tx + '.json')
             if cached_trace is not None:
                 trace_count += 1
-            elif new_traces < max_traces:
+            elif not historical and new_traces < max_traces:
                 new_traces += 1
                 try:
                     self.cached_rpc('traces', tx, 'debug_traceTransaction', [tx, {'tracer': 'callTracer', 'timeout': '10s'}])
@@ -487,6 +562,7 @@ class Collector:
 
 def cached_logs(store, plan):
     logs, intervals, complete = [], [], True
+    headers = store.get('cache/snapshots/headers.json', {})
     for scope in plan['scopes']:
         chunks = store.chunks(scope['id'])
         covered = []
@@ -494,6 +570,13 @@ def cached_logs(store, plan):
             if meta['endBlock'] > plan['snapshot']['number']:
                 raise EvidenceError('chunk exceeds pinned snapshot')
             Collector.validate_logs(rows, scope['filter'], meta['startBlock'], meta['endBlock'])
+            if headers:
+                for block, expected in meta['headers'].items():
+                    if headers.get(hex(int(block)), {}).get('hash') != expected:
+                        raise EvidenceError('cached interval/header mismatch')
+                for row in rows:
+                    if headers.get(row['blockNumber'], {}).get('hash') != row['blockHash']:
+                        raise EvidenceError('cached event/header mismatch')
             covered.append((meta['startBlock'], meta['endBlock']))
             logs.extend(rows)
             intervals.append(meta)

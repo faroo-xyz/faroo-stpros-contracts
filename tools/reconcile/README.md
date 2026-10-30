@@ -13,7 +13,7 @@ python3 -m tools.reconcile all
 python3 -m tools.reconcile all --advance
 python3 -m tools.reconcile reconcile
 python3 -m tools.reconcile status
-python3 -m unittest tools.reconcile.test_reconcile -v
+python3 -m unittest tools.reconcile.test_reconcile tools.reconcile.test_closeout tools.reconcile.test_incremental -v
 ```
 
 `PHAROS_RPC_URL` is normally inherited. During the recorded audit, the owner authorized the narrow
@@ -37,17 +37,20 @@ are recorded; reports identify the replay source hashes as well as repository HE
 a snapshot. `sync` fills only uncovered intervals. `all` also reads snapshot,
 migration, external staking/roles, implementation identities and selected transaction
 evidence. `reconcile` never constructs an RPC client and regenerates reports offline.
-`--advance` pins a later finalized block; the old snapshot and cached interval anchors
-must remain canonical. Reorganizations stop the run and preserve evidence for manual
+`--advance` pins a later finalized block, or resumes the pending snapshot after interruption;
+the previous finalized hash and new interval anchors must remain canonical. Reorganizations stop the run and preserve evidence for manual
 investigation. Use a separate data directory to audit a different canonical history.
 
-Defaults: 5,000,000 **cumulative estimated CU** for this cache, 0.5 seconds/request,
-initial 5,000 blocks/query, adaptive growth to 50,000 only until the provider rejects
-a range. The learned ceiling is retained. At most ten read requests share an HTTP
+Defaults: 5,000,000 **cumulative estimated CU** for this cache and 100,000
+**per-invocation estimated CU**, with 0.5 seconds/request. Log queries are bounded
+to 1,000 blocks, including previously learned larger limits; smaller learned limits
+are retained. The legacy `--chunk` option is accepted but capped at 1,000 at runtime. At most ten read requests share an HTTP
 batch; every item, failed request and retry is charged independently. Traces are
 sequential, with a conservative estimate of 10,000 CU each. Weights are in `rpc.py`;
 they are internal estimates, not Alchemy's actual invoice. `--budget-cu` may lower the
-ceiling but cannot raise it above 5,000,000. Default per-run caps are 2,000 new receipt/transaction pairs
+ceiling but cannot raise it above 5,000,000. `--run-budget-cu` explicitly sets the
+independent per-invocation ceiling (default 100,000); neither ceiling increases automatically.
+Default per-run caps are 2,000 new receipt/transaction pairs
 and 40 new traces; cached evidence does not consume these caps. `--max-receipts`, `--max-traces`, `--request-interval`, `--chunk` and
 `--fallback-depth` are configurable. No automatic budget reset exists.
 
@@ -65,7 +68,8 @@ separate transitions, with block-boundary state and targeted native trace eviden
 Oracle reward dilution uses `floor(fee * V / (T + reward - fee))`, with ppm fees,
 historical caps, cooldown, APR bounds and zero-supply handling.
 
-Outputs under `output/reconciliation/`:
+Original audit outputs under `output/reconciliation/` are retained unchanged. New
+attempts and completed snapshots use the subdirectories described below, with the same files:
 
 - `RECONCILIATION-REPORT.md`, `RECONCILIATION-RESULTS.json`
 - `ANOMALIES.csv`, `RPC-USAGE.json`, `DATA-MANIFEST.json`
@@ -112,3 +116,79 @@ A recorded-build correspondence PASS is not a fresh compilation or a solvency ve
 A verified native reward credit/forwarding path is distinct from authentication of the
 underlying Staking reward formula. The closeout retains those distinctions and reports
 stale off-chain administrator assertions separately from financial discrepancies.
+
+## Daily/weekly incremental reconciliation
+
+```sh
+python3 -m tools.reconcile status
+python3 -m tools.reconcile all --advance
+python3 -m tools.reconcile reconcile
+```
+
+The first advance validates the completed block **21647956** report, its published
+manifest, cached headers, full interval coverage and checksums, then seals that
+historical boundary. Each existing filter starts at **21647957**, or at its next
+uncovered block after an interrupted collection. A pending snapshot is completed
+before a repeated `all --advance` can select another one. A newly discovered routing
+address still needs a bounded backfill; already verified intervals are never downloaded
+again. Raw events, receipts, traces and the original P0 closeout remain shared and intact.
+
+Every online run checks chainId, the previous finalized block hash, the new finalized
+snapshot and the first new block's parent. New event-block and interval-end hashes,
+including empty intervals, are checked; resumed new intervals are checked freshly.
+Previously sealed historical anchors are checked against local checksums and header
+records without thousands of historical RPC reads. Canonical hash-by-number and the
+provider's finalized tag remain explicit RPC trust assumptions; this is not a light
+client or independent consensus proof. Incremental mode refuses a missing finalized
+tag instead of falling back to a probabilistic depth. Reorganizations, changed sealed
+files, gaps in sealed history and conflicting events fail closed.
+
+Historical migration receipt/trace and archive-call probes, the original log sample,
+completed reward balance probes, known historical implementation checks, and the
+WPROS audit-start code read are reused. Snapshot-dependent runtime, proxy/admin slots,
+routing, role, custody and staking observations are still refreshed. New transactions
+are collected within the receipt/trace and CU caps; missing historical evidence is
+not silently upgraded or repeatedly enriched. Replay still evaluates the complete
+ordered V1/V4 event history offline; parsed chunks are reused within an invocation.
+
+The immutable SLP source/ABI closure comes from
+`cache/snapshots/p0-closeout-attestation.json`. Every new snapshot compares current
+proxy runtime, implementation slots and full implementation runtime hashes and examines
+all subsequent upgrade events before installing that ABI. A changed/unknown version,
+beacon or intervening upgrade blocks ABI reuse (even an upgrade away and back).
+Supporting additional verified versions requires a reviewed historical ABI mapping;
+there is no automatic source re-attestation. Routing getters are compared with
+initialization and ordered configuration events; roles and authority are separate
+checks. Reward provenance and underlying Staking asset backing remain **UNVERIFIED**.
+
+New completed reports live at:
+
+`output/reconciliation/snapshots/<block>-<full-block-hash>/`
+
+The usual Markdown/JSON/CSV outputs are joined by `INCREMENTAL-SUMMARY.json`, containing
+snapshot hashes/ranges, new events/transactions, exact integer accounting deltas and
+18-decimal displays, custody/staking observations, findings introduced/resolved/changed,
+and run/cumulative CU. Exchange-rate deltas are exact fractions with a presentation rounded down
+to 18 decimal places. stPROS shares and PROS assets retain distinct units. All stake
+amounts and reward origin remain provisional; cash observations do not establish
+attributable backing or economic solvency. A completed *collection* can contain FAIL,
+BLOCKED or UNVERIFIED findings; it does not certify the protocol.
+
+`output/reconciliation/attempts/<block>-<full-block-hash>/` holds incomplete/interrupted
+attempts and offline regeneration. A completed directory is never overwritten.
+Preparation seals the report and evidence before atomic directory publication, so
+interruption can be recovered without changing a completed report. Finalized history
+seals live in `checkpoints/finalized/`; `completed-snapshot.json` selects the latest.
+Raw evidence is not duplicated in Research Git. The original fixed-snapshot closeout
+and first-round reports are not rewritten.
+
+`status` separates cumulative usage from the most recent online invocation. The
+historical ledger is never reset. Each attempt (including retries and failed requests)
+is charged before sending; a batch reserves its full estimated cost before transmission.
+The run checkpoint and `output/rpc-usage/runs/<run-id>.json` retain usage per invocation.
+Reaching either ceiling preserves published chunks/checkpoints and writes an incomplete
+attempt; rerun the same command to resume under a new run allowance. The cumulative
+5,000,000-CU cap still applies across every invocation. Estimates are not provider bills.
+
+Development acceptance uses synthetic transports and an isolated copy of the existing
+cache when present. No live mainnet advance, Foundry, Hardhat or full CI is required.

@@ -57,6 +57,8 @@ def observe(collector, snap, logs):
     epoch = abi.dec_uint(current_epoch_raw) if current_epoch_raw else None
     out['stakingImplementation'] = call(STAKING, 'getImplAddress()')
     for addr in slps(inv):
+        if inv['targets'][addr]['abiStatus'] == 'UNVERIFIED_IMPLEMENTATION':
+            continue
         pools = set(all_pools) | set(array(call(addr, 'registeredPools()')))
         for log in logs:
             if log['address'].lower() == addr and len(log['topics']) > 2:
@@ -108,7 +110,7 @@ def observe(collector, snap, logs):
         call(addr, 'getRewardsVault()')
     # Enumerate both roles even if they are absent from current documentation.
     for addr, target in inv['targets'].items():
-        if target['abiStatus'] != 'UNVERIFIED_SOURCE_HINT':
+        if target['abiStatus'] not in ('UNVERIFIED_SOURCE_HINT', 'AUTHENTICATED_RECORDED_RUNTIME'):
             continue
         roles = {}
         for role in ('0x' + '00' * 32, keccak256(b'WHITELIST_ROLE')):
@@ -139,11 +141,11 @@ def observe_proxy_slots(collector, snap):
     from .inventory import IMPL_SLOT
     out = collector.store.get('cache/snapshots/external-state.json', {})
     if out.get('snapshot') != snap:
-        return None
+        out = {'snapshot': snap, 'source': SOURCE, 'status': 'UNVERIFIED', 'reads': {}, 'positions': {}, 'roles': {}, 'errors': {}}
     slots = out.setdefault('proxySlots', {})
     admin_slot = hex(int(keccak256(b'eip1967.proxy.admin'), 16) - 1)
     for addr, target in collector.inv['targets'].items():
-        if target['abiStatus'] != 'UNVERIFIED_SOURCE_HINT' or addr in slots:
+        if target['abiStatus'] not in ('UNVERIFIED_SOURCE_HINT', 'AUTHENTICATED_RECORDED_RUNTIME', 'UNVERIFIED_IMPLEMENTATION') or addr in slots:
             continue
         row = {'interpretation': 'Raw EIP-1967 observations; proxy/source identity remains unverified'}
         for label, slot in [('implementation', IMPL_SLOT), ('admin', admin_slot)]:
@@ -192,8 +194,12 @@ def verify_fixed_contracts(collector, snap):
                                'status': 'PASS' if actual == expected else 'FAIL', 'record': path,
                                'recordSha256': digest(data)}
         if name == 'WPROS':
-            first = collector.rpc.call('eth_getCode', [address, hex(collector.inv['start'])])
-            out['entries'][name]['atAuditStart'] = keccak256(bytes.fromhex(first.removeprefix('0x')))
+            prior = collector.boundary['context'].get('fixed-code-identities', {}).get('entries', {}).get(name, {}) if collector.boundary else {}
+            if prior.get('status') == 'PASS' and prior.get('recordSha256') == digest(data):
+                out['entries'][name]['atAuditStart'] = prior['atAuditStart']
+            else:
+                first = collector.rpc.call('eth_getCode', [address, hex(collector.inv['start'])])
+                out['entries'][name]['atAuditStart'] = keccak256(bytes.fromhex(first.removeprefix('0x')))
             if out['entries'][name]['atAuditStart'] != expected:
                 out['entries'][name]['status'] = 'FAIL'
         collector.store.put('cache/snapshots/fixed-code-identities.json', out)
@@ -234,3 +240,84 @@ def discover_proxy_admin_history(collector, plan):
     if added:
         collector.sync(dict(plan, scopes=added))
     return bool(added)
+
+
+def authenticate_incremental(collector, snap, logs):
+    """Carry immutable recorded source identities only after current runtime/slot checks.
+
+    No source checkout, compiler or fixed-snapshot closeout is rerun. Changed versions
+    require an explicitly reviewed historical ABI timeline before decoding their events.
+    """
+    from .inventory import PROXY_ABI, decode
+    from .storage import canonical, digest
+    proof = collector.store.get('cache/snapshots/p0-closeout-attestation.json')
+    out = {'snapshot': snap, 'sourceProofSha256': digest(canonical(proof)), 'entries': {}, 'scope': 'Current runtime correspondence only; no reward/backing certification'}
+    from .incremental import same
+    external_state = collector.store.get('cache/snapshots/external-state.json', {})
+    slots = external_state.get('proxySlots', {}) if same(external_state.get('snapshot'), snap) else {}
+    for address, target in collector.inv['targets'].items():
+        if not (target['name'].startswith('SlpPharosProxy') or 'RewardsVault' in target['name']):
+            continue
+        row = {'status': 'UNVERIFIED', 'reason': 'Authenticated source mapping missing', 'upgradeEvents': []}
+        original = proof.get('proxies', {}).get(address) if proof and proof.get('status') == 'PASS' else None
+        if original and original.get('status') == 'PASS' and proof['snapshot']['number'] <= snap['number']:
+            impl = original['implementation']
+            binding = proof['implementations'][impl]
+            if digest(canonical(binding['abi'])) != binding['abiSha256'] or original['abi'] != binding['abi'] + PROXY_ABI:
+                raise EvidenceError('authenticated ABI checksum mismatch')
+            row.update(implementation=slots.get(address, {}).get('implementation'),
+                       sourceSnapshot=proof['snapshot'], sourceIdentity={k: binding[k] for k in
+                       ('runtimeKeccak', 'metadataSha256', 'abiSha256', 'sourceKeccak256', 'recordSha256', 'compilerInputSha256')})
+            upgrades = []
+            for log in logs:
+                if log['address'].lower() == address and number(log['blockNumber']) > proof['snapshot']['number']:
+                    event = decode(log, PROXY_ABI)
+                    if event and event['name'] == 'BeaconUpgraded':
+                        upgrades.append({'implementation': 'UNVERIFIED_BEACON', 'block': number(log['blockNumber']), 'transaction': log['transactionHash']})
+                    if event and event['name'] == 'Upgraded':
+                        upgrades.append({'implementation': event['args']['implementation'].lower(),
+                                         'block': number(log['blockNumber']), 'transaction': log['transactionHash']})
+            row['upgradeEvents'] = upgrades
+            slot = slots.get(address, {})
+            if not slot.get('implementation') or not slot.get('runtimeKeccak'):
+                row.update(status='UNVERIFIED', reason='Current snapshot proxy slot/runtime evidence missing')
+            elif (slot.get('implementation') != impl or slot.get('runtimeKeccak') != original['runtimeKeccak'] or
+                    any(e['implementation'] != impl for e in upgrades)):
+                row.update(status='BLOCKED', reason='Unknown or changed implementation/proxy history; ABI timeline requires verified mapping')
+            elif binding.get('status') != 'PASS':
+                row.update(status='BLOCKED', reason='Source identity is not authenticated')
+            else:
+                try:
+                    code = collector.rpc.call('eth_getCode', [impl, hex(snap['number'])])
+                    actual = keccak256(bytes.fromhex(code.removeprefix('0x')))
+                    row['currentRuntimeKeccak'] = actual
+                    row.update(status='PASS' if actual == binding['runtimeKeccak'] else 'BLOCKED',
+                               reason='Current implementation matches authenticated full runtime' if actual == binding['runtimeKeccak'] else 'Current runtime differs from authenticated implementation')
+                except RpcError:
+                    row.update(status='UNVERIFIED', reason='Current implementation runtime unavailable')
+            row['adminChanged'] = slot.get('admin') != original['admin']
+        out['entries'][address] = row
+    collector.store.put('cache/snapshots/incremental-external.json', out)
+    return out
+
+
+def bound_inventory(inv, proof, current, snap):
+    """Never install an old external ABI unless this snapshot proves its runtime history."""
+    import copy
+    from .inventory import PROXY_ABI
+    from .incremental import same
+    from .storage import canonical, digest
+    if same(current.get('snapshot'), snap) and current.get('sourceProofSha256') != digest(canonical(proof)):
+        raise EvidenceError('snapshot source proof binding mismatch')
+    result = copy.deepcopy(inv)
+    for address, target in result['targets'].items():
+        if not (target['name'].startswith('SlpPharosProxy') or 'RewardsVault' in target['name']):
+            continue
+        row = current.get('entries', {}).get(address, {}) if same(current.get('snapshot'), snap) else {}
+        if row.get('status') == 'PASS' and proof and address in proof['proxies']:
+            target['abi'] = proof['proxies'][address]['abi']
+            target['abiStatus'] = 'AUTHENTICATED_RECORDED_RUNTIME'
+        else:
+            target['abi'] = PROXY_ABI
+            target['abiStatus'] = 'UNVERIFIED_IMPLEMENTATION'
+    return result

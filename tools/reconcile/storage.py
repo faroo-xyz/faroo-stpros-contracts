@@ -58,6 +58,7 @@ def write(path, value):
 class Store:
     def __init__(self, root):
         self.root = safe(root).resolve()
+        self._chunks = {}
         for p in ('cache/events', 'cache/receipts', 'cache/traces', 'cache/snapshots',
                   'cache/manifests', 'checkpoints', 'output/reconciliation',
                   'output/anomalies', 'output/rpc-usage'):
@@ -112,11 +113,21 @@ class Store:
                     headers=headers, status='COMPLETE')
         # Manifest publication is the commit point; orphan payloads are ignored.
         self.put(f'cache/manifests/{name}.json', meta)
+        self._chunks.pop(scope, None)
         return meta
 
     def chunks(self, scope):
         result = []
-        for p in sorted((self.root / 'cache/manifests').glob(f'{scope}-*.json')):
+        paths = sorted((self.root / 'cache/manifests').glob(f'{scope}-*.json'))
+        def stamp(path):
+            st = path.stat()
+            return (str(path), st.st_ino, st.st_size, st.st_mtime_ns, st.st_ctime_ns)
+        stamps = [stamp(p) for p in paths]
+        previous = self._chunks.get(scope)
+        if previous and previous[0] == stamps:
+            if previous[1] == [stamp(self.root / m['file']) for m, _ in previous[2]]:
+                return previous[2]
+        for p in paths:
             m = self.get(str(p.relative_to(self.root)))
             if m['scope'] != scope or m['chainId'] != 1672 or m['status'] != 'COMPLETE':
                 raise EvidenceError('chunk identity mismatch')
@@ -136,6 +147,7 @@ class Store:
         for (a, _), (b, _) in zip(result, result[1:]):
             if a['endBlock'] >= b['startBlock']:
                 raise EvidenceError('overlapping intervals')
+        self._chunks[scope] = (stamps, [stamp(self.root / m['file']) for m, _ in result], result)
         return result
 
 
