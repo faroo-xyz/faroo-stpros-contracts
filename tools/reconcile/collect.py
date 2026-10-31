@@ -7,6 +7,61 @@ from .rpc import RpcError, BudgetExceeded, WEIGHTS
 from . import incremental
 
 
+def transaction_requirements(inv, logs, boundary=-1):
+    """Required traces cover payment/reward movements; other transactions are optional."""
+    from .external import STAKING_ABI
+    names = {'WithdrawalCompleted', 'RewardClaimed', 'CoinMinted', 'EthDeposited',
+             'OracleNotified', 'TransferredToRewardsVault', 'TokenAmountUpdated'}
+    items = STAKING_ABI + [item for target in inv['targets'].values() for item in target.get('abi', [])]
+    topics = {abi.event_topic(abi.item_signature(i)) for i in items
+              if i.get('type') == 'event' and i.get('name') in names}
+    # Scheduling hints are conservative even when an external ABI is unverified.
+    topics.update(abi.event_topic(sig) for sig in (
+        'WithdrawalCompleted(address,address,uint256)', 'EthDeposited(address,uint256)',
+        'OracleNotified(address,uint256)', 'TransferredToRewardsVault(address,uint256)',
+        'TokenAmountUpdated(address,uint256,uint256)'))
+    grouped = {}
+    for log in logs:
+        grouped.setdefault(log['transactionHash'].lower(), []).append(log)
+    pending = {tx for tx, rows in grouped.items() if max(number(l['blockNumber']) for l in rows) > boundary}
+    required = {tx for tx in pending if tx == inv['release']['upgradeTransaction'].lower() or
+                any(l['topics'] and l['topics'][0] in topics for l in grouped[tx])}
+    return grouped, pending, required
+
+
+def usable_trace(trace):
+    return isinstance(trace, dict) and bool(trace.get('type')) and not trace.get('error')
+
+
+def transaction_readiness(store, inv, logs, snapshot, boundary=-1):
+    """Recompute the completion gate offline; never trust a stale coverage checkpoint."""
+    grouped, pending, required = transaction_requirements(inv, logs, boundary)
+    missing_receipts, missing_traces = [], []
+    headers = store.get('cache/snapshots/headers.json', {})
+    for tx in sorted(pending):
+        rows = grouped[tx]
+        receipt = store.get('cache/receipts/' + tx + '.json')
+        detail = store.get('cache/receipts/' + tx + '-transaction.json')
+        expected = rows[0]['blockHash']
+        if headers.get(rows[0]['blockNumber'], {}).get('hash') != expected:
+            raise EvidenceError('transaction event/header mismatch')
+        if receipt is not None and (receipt.get('blockHash') != expected or number(receipt.get('status', 0)) != 1):
+            raise EvidenceError('receipt inconsistent with pinned successful logs')
+        if receipt is not None:
+            for row in rows:
+                matches = [r for r in receipt.get('logs', []) if number(r['logIndex']) == number(row['logIndex'])]
+                if len(matches) != 1 or any(matches[0][k] != row[k] for k in ('address', 'topics', 'data', 'blockHash', 'transactionHash')):
+                    raise EvidenceError('receipt/log mismatch')
+        if detail is not None and detail.get('blockHash') != expected:
+            raise EvidenceError('transaction details differ from pinned block')
+        if receipt is None or detail is None:
+            missing_receipts.append(tx)
+        if tx in required and (receipt is None or not usable_trace(store.get('cache/traces/' + tx + '.json'))):
+            missing_traces.append(tx)
+    return {'snapshot': snapshot, 'missingReceipts': missing_receipts, 'missingRequiredTraces': missing_traces,
+            'requiredEvidenceComplete': not missing_receipts and not missing_traces}
+
+
 class Collector:
     def __init__(self, store, rpc, inv):
         self.store, self.rpc, self.inv = store, rpc, inv
@@ -55,14 +110,14 @@ class Collector:
         if self.header(snap['number'], fresh=True)['hash'] != snap['hash']:
             raise EvidenceError('REORG: snapshot hash mismatch; cache preserved')
 
-    def cached_rpc(self, category, key, method, params, expected_hash=None):
+    def cached_rpc(self, category, key, method, params, expected_hash=None, retries=2):
         rel = f'cache/{category}/{key}.json'
         old = self.store.get(rel)
         if old is not None:
             if expected_hash and old.get('blockHash') != expected_hash:
                 raise EvidenceError('cached transaction block hash mismatch')
             return old
-        result = self.rpc.call(method, params)
+        result = self.rpc.call(method, params, retries=retries)
         if result is None:
             raise RpcError('evidence_unavailable')
         if expected_hash and result.get('blockHash') != expected_hash:
@@ -148,7 +203,19 @@ class Collector:
             ('trace', 'debug_traceTransaction', [migration, {'tracer': 'callTracer', 'timeout': '10s'}]),
             ('stakingCode', 'eth_getCode', [STAKING, hex(snap['number'])])]:
             try:
-                result = self.rpc.call(method, params)
+                if label == 'trace':
+                    receipt = self.store.get('cache/receipts/' + migration + '.json')
+                    if not receipt or number(receipt.get('status', 0)) != 1:
+                        plan['capabilities'][label] = 'UNVERIFIED_RECEIPT'
+                        self.store.put('checkpoints/plan.json', plan)
+                        continue
+                    if self.header(number(receipt['blockNumber']))['hash'] != receipt['blockHash']:
+                        raise EvidenceError('migration receipt/header mismatch')
+                    if not self.can_collect_trace():
+                        plan['capabilities'][label] = 'DEFERRED_BUDGET'
+                        self.store.put('checkpoints/plan.json', plan)
+                        continue
+                result = self.rpc.call(method, params, retries=0 if label == 'trace' else 2)
                 plan['capabilities'][label] = 'AVAILABLE' if result is not None and result != '0x' else 'UNAVAILABLE'
                 if label in ('receipt', 'trace') and result:
                     self.store.put(f'cache/{"receipts" if label == "receipt" else "traces"}/{migration}.json', result)
@@ -483,13 +550,11 @@ class Collector:
         self.store.put('cache/snapshots/migration-state.json', out)
         return out
 
-    def transactions(self, logs, max_receipts=2000, max_traces=40):
-        transactions = {}
-        grouped = {}
+    def transactions(self, logs, max_receipts=2000, max_traces=40, include_optional=True):
+        boundary = self.boundary['snapshot']['number'] if self.boundary else -1
+        grouped, pending, required = transaction_requirements(self.inv, logs, boundary)
+        transactions = {tx: rows[0]['blockHash'] for tx, rows in grouped.items()}
         migration = self.inv['release']['upgradeTransaction'].lower()
-        for log in logs:
-            transactions[log['transactionHash'].lower()] = log['blockHash']
-            grouped.setdefault(log['transactionHash'].lower(), []).append(log)
         priorities = {}
         critical_topics = {abi.event_topic(s) for s in ['TokenAmountUpdated(address,uint256,uint256)',
             'EmergencyWithdraw(address,address,uint256)', 'SlpPharosProxySet(address,address)',
@@ -504,60 +569,104 @@ class Collector:
             if topic == completion_topic:
                 priority = 1 if len(log['topics']) > 2 and abi.topic_addr(log['topics'][2]) == st else 3
             priorities[tx] = min(priorities.get(tx, 4), priority)
-        ordered_txs = sorted(transactions, key=lambda t: (priorities[t], t))
-        receipt_count = trace_count = new_receipts = new_traces = 0
+        ordered_txs = sorted(transactions, key=lambda t: (t not in required, priorities[t], t))
+        coverage = dict(snapshot=self.store.get('checkpoints/plan.json', {}).get('snapshot'),
+                        total=len(transactions), receipts=0, traces=0, newReceiptAttempts=0, newTraceAttempts=0,
+                        receiptCap=max_receipts, traceCap=max_traces, missingReceipts=sorted(pending),
+                        missingRequiredTraces=sorted(required), requiredEvidenceComplete=False,
+                        limitation='Event-discovered transactions only; historical gaps remain unverified.')
+        self.transaction_work = (ordered_txs, grouped, pending, required, set(), coverage)
         expected_scopes = self.store.get('checkpoints/plan.json', {}).get('scopes') or scopes(self.inv)
-        for tx in ordered_txs:
-            has_receipt = self.store.get('cache/receipts/' + tx + '.json') is not None
-            has_transaction = self.store.get('cache/receipts/' + tx + '-transaction.json') is not None
-            historical = self.boundary and max(number(l['blockNumber']) for l in grouped[tx]) <= self.boundary['snapshot']['number']
-            if not has_receipt or not has_transaction:
-                if historical:
-                    continue
-                if new_receipts >= max_receipts:
-                    continue
-                new_receipts += 1
-            try:
-                receipt = self.cached_rpc('receipts', tx, 'eth_getTransactionReceipt', [tx], transactions[tx])
-                if receipt['blockHash'] != transactions[tx] or number(receipt['status']) != 1:
-                    raise EvidenceError('receipt inconsistent with successful logs')
-                self.cached_rpc('receipts', tx + '-transaction', 'eth_getTransactionByHash', [tx], transactions[tx])
-                # Check all known transaction logs, including missing logs inside the collected scope.
-                selected = grouped[tx]
-                for log in selected:
-                    match = [x for x in receipt['logs'] if number(x['logIndex']) == number(log['logIndex'])]
-                    if len(match) != 1 or any(match[0][k] != log[k] for k in ('address', 'topics', 'data', 'blockHash', 'transactionHash')):
-                        raise EvidenceError('receipt/log mismatch')
-                selected_indices = {number(l['logIndex']) for l in selected}
-                for receipt_log in receipt['logs']:
-                    relevant = False
-                    for scope in expected_scopes:
-                        try:
-                            self.validate_logs([receipt_log], scope['filter'], scope['start'], 2**63)
-                            relevant = True
-                            break
-                        except EvidenceError:
-                            pass
-                    if relevant and number(receipt_log['logIndex']) not in selected_indices:
-                        raise EvidenceError('missing scoped log revealed by receipt')
-                receipt_count += 1
-            except RpcError:
-                continue
-            cached_trace = self.store.get('cache/traces/' + tx + '.json')
-            if cached_trace is not None:
-                trace_count += 1
-            elif not historical and new_traces < max_traces:
-                new_traces += 1
+        try:
+            for tx in ordered_txs:
+                has_receipt = self.store.get('cache/receipts/' + tx + '.json') is not None
+                has_transaction = self.store.get('cache/receipts/' + tx + '-transaction.json') is not None
+                historical = self.boundary and max(number(l['blockNumber']) for l in grouped[tx]) <= self.boundary['snapshot']['number']
+                if not has_receipt or not has_transaction:
+                    if historical:
+                        continue
+                    if coverage['newReceiptAttempts'] >= max_receipts:
+                        continue
+                    coverage['newReceiptAttempts'] += 1
                 try:
-                    self.cached_rpc('traces', tx, 'debug_traceTransaction', [tx, {'tracer': 'callTracer', 'timeout': '10s'}])
-                    trace_count += 1
+                    receipt = self.cached_rpc('receipts', tx, 'eth_getTransactionReceipt', [tx], transactions[tx])
+                    if receipt['blockHash'] != transactions[tx] or number(receipt['status']) != 1:
+                        raise EvidenceError('receipt inconsistent with successful logs')
+                    self.cached_rpc('receipts', tx + '-transaction', 'eth_getTransactionByHash', [tx], transactions[tx])
+                    # Check all known transaction logs, including missing logs inside the collected scope.
+                    selected = grouped[tx]
+                    for log in selected:
+                        if log['blockNumber'] in self.headers and self.headers[log['blockNumber']]['hash'] != log['blockHash']:
+                            raise EvidenceError('transaction event/header mismatch')
+                        match = [x for x in receipt['logs'] if number(x['logIndex']) == number(log['logIndex'])]
+                        if len(match) != 1 or any(match[0][k] != log[k] for k in ('address', 'topics', 'data', 'blockHash', 'transactionHash')):
+                            raise EvidenceError('receipt/log mismatch')
+                    selected_indices = {number(l['logIndex']) for l in selected}
+                    for receipt_log in receipt['logs']:
+                        relevant = False
+                        for scope in expected_scopes:
+                            try:
+                                self.validate_logs([receipt_log], scope['filter'], scope['start'], 2**63)
+                                relevant = True
+                                break
+                            except EvidenceError:
+                                pass
+                        if relevant and number(receipt_log['logIndex']) not in selected_indices:
+                            raise EvidenceError('missing scoped log revealed by receipt')
+                    coverage['receipts'] += 1
+                    self.transaction_work[4].add(tx)
+                    if tx in pending:
+                        coverage['missingReceipts'].remove(tx)
+                except RpcError:
+                    continue
+        finally:
+            self.save_transaction_coverage()
+        return self.collect_transaction_traces(max_traces, include_optional)
+
+    def save_transaction_coverage(self):
+        _, _, pending, required, validated, coverage = self.transaction_work
+        coverage['traces'] = sum(usable_trace(self.store.get('cache/traces/' + tx + '.json')) for tx in validated)
+        coverage['missingRequiredTraces'] = sorted(tx for tx in required if tx not in validated or
+            not usable_trace(self.store.get('cache/traces/' + tx + '.json')))
+        coverage['requiredEvidenceComplete'] = not coverage['missingReceipts'] and not coverage['missingRequiredTraces']
+        self.store.put('checkpoints/transaction-coverage.json', coverage)
+        return coverage
+
+    def can_collect_trace(self):
+        # Reserve reward, final-snapshot and historical-boundary checks. Rpc still charges
+        # each request/retry before sending and enforces both original ceilings.
+        reserve = 3 * WEIGHTS['eth_getBlockByNumber']
+        cost = WEIGHTS['debug_traceTransaction'] + reserve
+        return (self.rpc.ledger['estimatedCU'] + cost <= self.rpc.budget and
+                self.rpc.run_usage()['estimatedCU'] + cost <= self.rpc.run_budget)
+
+    def collect_transaction_traces(self, max_traces=40, include_optional=True):
+        ordered_txs, grouped, pending, required, validated, coverage = self.transaction_work
+        try:
+            # No trace can consume the budget needed by a missing receipt/detail pair,
+            # including when a receipt cap or a provider failure stopped that phase.
+            if coverage['missingReceipts']:
+                return coverage
+            for tx in ordered_txs:
+                if tx not in pending or tx not in validated or (not include_optional and tx not in required):
+                    continue
+                trace = self.store.get('cache/traces/' + tx + '.json')
+                if trace is not None:  # Preserve existing evidence, including unsuccessful traces.
+                    continue
+                if coverage['newTraceAttempts'] >= max_traces or not self.can_collect_trace():
+                    break
+                row = grouped[tx][0]
+                if self.headers.get(row['blockNumber'], {}).get('hash') != row['blockHash']:
+                    raise EvidenceError('trace requires a verified event block header')
+                coverage['newTraceAttempts'] += 1
+                try:
+                    self.cached_rpc('traces', tx, 'debug_traceTransaction', [tx, {'tracer': 'callTracer', 'timeout': '10s'}], retries=0)
                 except RpcError as exc:
                     if exc.category == 'unsupported':
-                        max_traces = 0
-        self.store.put('checkpoints/transaction-coverage.json', dict(total=len(transactions), receipts=receipt_count,
-                       traces=trace_count, newReceiptAttempts=new_receipts, newTraceAttempts=new_traces,
-                       receiptCap=max_receipts, traceCap=max_traces,
-                       limitation='Only transactions discovered through protocol events; native-only unsolicited transfers remain unverified.'))
+                        break
+        finally:
+            self.save_transaction_coverage()
+        return coverage
 
 
 def cached_logs(store, plan):

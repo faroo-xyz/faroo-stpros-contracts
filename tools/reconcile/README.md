@@ -192,3 +192,21 @@ attempt; rerun the same command to resume under a new run allowance. The cumulat
 
 Development acceptance uses synthetic transports and an isolated copy of the existing
 cache when present. No live mainnet advance, Foundry, Hardhat or full CI is required.
+
+### Receipt-first resume
+
+`all` resumes the currently pinned snapshot without selecting a newer block. Missing
+receipt/transaction-detail pairs are collected and validated before any new trace.
+Payment/reward traces and reward balance evidence precede optional traces; traces
+without a successful matching receipt cannot qualify offline findings. Optional
+traces are deferred when either CU ceiling lacks room for the trace plus final
+anchor checks. Trace requests are not automatically retried within the same run.
+
+Missing required receipts, payment/reward traces or reward cases leave the attempt
+UNVERIFIED/INCOMPLETE and prevent completed-snapshot publication. Progress survives
+budget exhaustion, including a receipt saved before its transaction-detail request.
+Resume with the same 100,000/5,000,000 CU limits and inherited `PHAROS_RPC_URL`:
+
+```sh
+python3 -m tools.reconcile all --run-budget-cu 100000 --budget-cu 5000000
+```

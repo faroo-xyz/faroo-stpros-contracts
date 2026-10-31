@@ -45,7 +45,7 @@ def seal(store, plan, result, folder, source=None):
     from .collect import cached_logs
     logs, chunks, complete = cached_logs(store, plan)
     snap = plan['snapshot']
-    if not complete or not result.get('collectionComplete') or result.get('executionBlocker'):
+    if not complete or not result.get('collectionComplete') or result.get('executionBlocker') or result.get('requiredEvidenceComplete') is False:
         raise EvidenceError('cannot finalize incomplete collection')
     if snap.get('finality') != 'provider-finalized-tag' or not same(result.get('snapshot'), snap):
         raise EvidenceError('trusted history requires provider-finalized snapshot')

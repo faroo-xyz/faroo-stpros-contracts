@@ -53,6 +53,8 @@ def provenance(inv, events, reported, custody):
 def collect_evidence(collector, snapshot, events, max_cases=32, max_new_traces=32):
     """Targeted traces and real native balance changes for reward claims/forwarding/reports."""
     from .rpc import RpcError
+    from .collect import usable_trace
+    from .storage import EvidenceError
     from .inventory import number
     inv, store = collector.inv, collector.store
     slps = {a for a, t in inv['targets'].items() if t['name'].startswith('SlpPharosProxy')}
@@ -66,11 +68,24 @@ def collect_evidence(collector, snapshot, events, max_cases=32, max_new_traces=3
         previous = collector.boundary['context'].get('reward-evidence', {}) if collector.boundary else {}
         out = {'snapshot': snapshot, 'cases': dict(previous.get('cases', {})), 'balanceReads': dict(previous.get('balanceReads', {})), 'scope': 'Block-boundary native deltas and targeted traces; external source identity not certified'}
     new_traces = 0
-    candidates = [(tx, rows) for tx, rows in grouped.items()
-                  if (not collector.boundary or number(rows[0]['raw']['blockNumber']) > collector.boundary['snapshot']['number'])
-                  and not (out['cases'].get(tx, {}).get('complete') and out['cases'][tx].get('trace') == 'AVAILABLE')]
+    pending = {tx: rows for tx, rows in grouped.items()
+               if not collector.boundary or number(rows[0]['raw']['blockNumber']) > collector.boundary['snapshot']['number']}
+    eligible = {}
+    for tx, rows in pending.items():
+        receipt = store.get('cache/receipts/' + tx + '.json')
+        if receipt is None:
+            continue
+        raw = rows[0]['raw']
+        if (number(receipt.get('status', 0)) != 1 or receipt.get('blockHash') != raw['blockHash'] or
+                collector.header(number(raw['blockNumber']))['hash'] != raw['blockHash']):
+            raise EvidenceError('reward receipt is not bound to successful pinned transaction')
+        eligible[tx] = rows
+    candidates = [(tx, rows) for tx, rows in eligible.items()
+                  if not (out['cases'].get(tx, {}).get('complete') and
+                          out['cases'][tx].get('blockHash') == rows[0]['raw']['blockHash'] and
+                          usable_trace(store.get('cache/traces/' + tx + '.json')))]
     for tx, rows in candidates[:max_cases]:
-        if tx in out['cases'] and out['cases'][tx].get('complete') and out['cases'][tx].get('trace') == 'AVAILABLE':
+        if not usable_trace(store.get('cache/traces/' + tx + '.json')) and max_new_traces == 0:
             continue
         block = number(rows[0]['raw']['blockNumber'])
         participants = set()
@@ -96,20 +111,26 @@ def collect_evidence(collector, snapshot, events, max_cases=32, max_new_traces=3
                     store.put('cache/snapshots/reward-evidence.json', out)
                 values.append(out['balanceReads'][key])
             case['balances'][address] = {'before': values[0], 'after': values[1], 'difference': values[1] - values[0]}
-        if store.get('cache/traces/' + tx + '.json') is not None:
-            case['trace'] = 'AVAILABLE'
-        elif new_traces < max_new_traces:
+        cached_trace = store.get('cache/traces/' + tx + '.json')
+        if cached_trace is not None:
+            case['trace'] = 'AVAILABLE' if usable_trace(cached_trace) else 'UNVERIFIED_TRACE'
+        elif new_traces < max_new_traces and collector.can_collect_trace():
             new_traces += 1
             try:
-                collector.cached_rpc('traces', tx, 'debug_traceTransaction', [tx, {'tracer': 'callTracer', 'timeout': '10s'}])
-                case['trace'] = 'AVAILABLE'
+                trace = collector.cached_rpc('traces', tx, 'debug_traceTransaction', [tx, {'tracer': 'callTracer', 'timeout': '10s'}], retries=0)
+                case['trace'] = 'AVAILABLE' if usable_trace(trace) else 'UNVERIFIED_TRACE'
             except RpcError:
                 case['trace'] = 'UNAVAILABLE'
         else:
-            case['trace'] = 'UNVERIFIED_TRACE_CAP'
+            case['trace'] = 'UNVERIFIED_TRACE_CAP_OR_BUDGET'
         case['complete'] = True
         out['cases'][tx] = case
         store.put('cache/snapshots/reward-evidence.json', out)
+    out['missingRequiredCases'] = sorted(tx for tx, rows in pending.items() if tx not in eligible or
+        not out['cases'].get(tx, {}).get('complete') or
+        out['cases'][tx].get('blockHash') != rows[0]['raw']['blockHash'] or
+        not usable_trace(store.get('cache/traces/' + tx + '.json')))
+    out['requiredEvidenceComplete'] = not out['missingRequiredCases']
     out['totalCandidateTransactions'] = len(grouped)
     out['caseLimit'] = max_cases
     store.put('cache/snapshots/reward-evidence.json', out)

@@ -11,7 +11,7 @@ from pathlib import Path
 from .storage import Store, EvidenceError, canonical, digest, atomic, write, safe
 from .inventory import discover, abi_hashes, source_binding, number, ROOT
 from .rpc import Rpc, BudgetExceeded, load_project_rpc_override
-from .collect import Collector, cached_logs
+from .collect import Collector, cached_logs, transaction_readiness, usable_trace
 from .replay import replay, finding
 from .assets import assess, payment_evidence, provisional_coverage
 from .external import observe, observe_proxy_slots, verify_fixed_contracts, discover_proxy_admin_history
@@ -54,6 +54,14 @@ def _offline(store, inv, blocker=None):
     if any(b['status'] != 'PASS' for b in bindings.values()) or not all(x['metadataMatch'] for x in inv['legacySources'].values()):
         identities = {}
     receipts, traces = cached_objects(store, 'receipts'), cached_objects(store, 'traces')
+    headers = store.get('cache/snapshots/headers.json', {})
+    # Orphan/error traces cannot prove a successful payment, conversion or asset movement.
+    receipts = {tx: r for tx, r in receipts.items() if number(r.get('status', 0)) == 1 and
+                headers.get(r.get('blockNumber'), {}).get('hash') == r.get('blockHash') and r.get('blockHash')}
+    traces = {tx: t for tx, t in traces.items() if tx in receipts and usable_trace(t)}
+    transaction_evidence = None
+    if plan and plan.get('historicalBoundary'):
+        transaction_evidence = transaction_readiness(store, inv, logs, snap, boundary['snapshot']['number'])
     result = replay(inv, logs, snap, states, complete,
         identities, receipts, traces, store.get('cache/snapshots/headers.json', {}))
     result.update(chainId=1672, sourceCommit=inv['sourceCommit'], abiHashes=abi_hashes(inv),
@@ -62,7 +70,12 @@ def _offline(store, inv, blocker=None):
                   collectionComplete=complete, discoveryStatus='UNVERIFIED beyond event-discoverable routes', collectedLogs=len(logs),
                   coveredIntervals=[{k: m[k] for k in ('scope', 'startBlock', 'endBlock', 'count', 'sha256')} for m in intervals],
                   limitations=inv['limitations'], executionBlocker=blocker,
-                  transactionCoverage=store.get('checkpoints/transaction-coverage.json', {}))
+                  transactionCoverage=store.get('checkpoints/transaction-coverage.json', {}),
+                  transactionEvidence=transaction_evidence)
+    if transaction_evidence:
+        result['checks'].append(finding('incremental-transaction-evidence',
+            'PASS' if transaction_evidence['requiredEvidenceComplete'] else 'UNVERIFIED',
+            'New transactions require successful block-bound receipts/details and payment/reward traces before snapshot completion.', actual=transaction_evidence))
     provenance_path = ROOT / 'snapshots/deployed/provenance.json'
     provenance_bytes = provenance_path.read_bytes()
     if digest(provenance_bytes) != inv['files']['snapshots/deployed/provenance.json']:
@@ -89,6 +102,11 @@ def _offline(store, inv, blocker=None):
             row['expected'], row['actual'], [row['record']], 'P1', row['address']))
     reward_evidence = store.get('cache/snapshots/reward-evidence.json', {})
     result['rewardEvidence'] = reward_evidence if reward_evidence.get('snapshot') == snap else {}
+    if transaction_evidence:
+        result['requiredEvidenceComplete'] = transaction_evidence['requiredEvidenceComplete'] and result['rewardEvidence'].get('requiredEvidenceComplete', False)
+        result['checks'].append(finding('incremental-reward-evidence',
+            'PASS' if result['rewardEvidence'].get('requiredEvidenceComplete') else 'UNVERIFIED',
+            'Required new reward receipt/trace/balance cases must be complete; this does not certify reward origin.'))
     result['rewardProvenance'] = rewards.provenance(inv, result['externalAccountingEvents'], result['replay']['rewards'], result.get('cashObservations', {}))
     timelock = inv['addresses']['governance']['timelock'].lower()
     for address, roles in result['externalState'].get('roles', {}).items():
@@ -171,6 +189,7 @@ def _offline(store, inv, blocker=None):
     result['checks'] += governance.historical_admin_findings(inv, result['governance'], result['externalState'], snap)
     transactions = {p.stem.removesuffix('-transaction'): store.get(str(p.relative_to(store.root)))
                     for p in (store.root / 'cache/receipts').glob('0x*-transaction.json')}
+    transactions = {tx: t for tx, t in transactions.items() if tx in receipts and t.get('blockHash') == receipts[tx]['blockHash']}
     # This selector was observed on mainnet's SLP forwarding transactions. It matches
     # a candidate signature absent from the supplied SLP source; do not decode it as verified ABI.
     from tools.lib.keccak import selector
@@ -442,10 +461,13 @@ def main(argv=None):
                         result = replay(collector.inv, logs, plan['snapshot'], complete=complete, identities=identities, headers=collector.headers)
                     governance.observe(collector, plan['snapshot'], result)
                     collector.migration_states(plan['snapshot'])
-                    trace_before = rpc.ledger['methods'].get('debug_traceTransaction', {}).get('requests', 0)
-                    rewards.collect_evidence(collector, plan['snapshot'], result['externalAccountingEvents'], max_new_traces=args.max_traces)
-                    trace_used = rpc.ledger['methods'].get('debug_traceTransaction', {}).get('requests', 0) - trace_before
-                    collector.transactions(logs, args.max_receipts, max(0, args.max_traces - trace_used))
+                    coverage = collector.transactions(logs, args.max_receipts, args.max_traces, include_optional=False)
+                    if coverage['missingReceipts']:
+                        raise EvidenceError('Required transaction receipts/details incomplete; resume pending snapshot')
+                    reward_evidence = rewards.collect_evidence(collector, plan['snapshot'], result['externalAccountingEvents'], max_new_traces=0)
+                    if not coverage['requiredEvidenceComplete'] or not reward_evidence['requiredEvidenceComplete']:
+                        raise EvidenceError('Required payment/reward evidence incomplete; resume pending snapshot')
+                    collector.collect_transaction_traces(args.max_traces)
                     collector.check_snapshot(plan['snapshot'])
                     if collector.boundary:
                         collector.check_snapshot(collector.boundary['snapshot'])
@@ -467,6 +489,7 @@ def main(argv=None):
         out = store.root / 'output/reconciliation/attempts/blocked' if result.get('executionBlocker') == 'cache integrity/schema failure' else output_dir(store, plan)
         finished = store.get('checkpoints/collection-finished.json', {})
         if (not blocker and not result.get('executionBlocker') and result.get('collectionComplete')
+                and result.get('requiredEvidenceComplete', not plan.get('historicalBoundary'))
                 and finished.get('complete') and incremental.same(finished.get('snapshot'), result.get('snapshot'))
                 and result['snapshot'].get('finality') == 'provider-finalized-tag'):
             try:
@@ -476,7 +499,7 @@ def main(argv=None):
                 store.put('checkpoints/execution.json', {'blocker': blocker})
         print(json.dumps({'report': str(out / 'RECONCILIATION-REPORT.md'),
                           'blocker': blocker, 'logs': result['collectedLogs'], 'usage': result['rpcUsage']}, sort_keys=True))
-        return 2 if blocker or result.get('executionBlocker') or (args.command == 'all' and not result.get('collectionComplete')) else 0
+        return 2 if blocker or result.get('executionBlocker') or result.get('requiredEvidenceComplete') is False or (args.command == 'all' and not result.get('collectionComplete')) else 0
 
 
 if __name__ == '__main__':
