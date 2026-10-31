@@ -480,3 +480,170 @@ class HistoricalAuthorityTests(unittest.TestCase):
         self.assertEqual(result[0]['actual']['windows'][0]['fromBlock'],100)
         self.assertEqual(result[0]['actual']['windows'][0]['untilBlockExclusiveApproximation'],150)
         self.assertEqual(result[0]['actual']['currentOwnerFromEvents'],timelock)
+
+
+class WPROSUnwrapTests(unittest.TestCase):
+    def setUp(self):
+        import copy
+        self.inv = copy.deepcopy(test_inventory())
+        self.wpros = self.inv['addresses']['asset']['WPROS'].lower()
+        # Reduced fixture from the cached mainnet transaction. Zero-value branches
+        # are omitted except for placeholders retaining the real 6.0 / 7 trace paths.
+        self.tx = '0x9dbfc3e8058bc707c379e28af632e23e9edb8788ce101f88081d540e64f6fe73'
+        self.router = '0xf7177baf6442fb76b0833aeca3de8d4dc8ffd695'
+        self.sender = '0xa7c71156897cae095a098c5474bef9ed39c5596d'
+        self.amount = 63119476875491958760980
+        self.block = '0x14b8a71'
+        self.block_hash = '0x6b9a549b5a6b10f6bc3a17b4888eadaf5d31535e113c2a9294d03a99f3c46e6e'
+        self.event = dict(address=self.wpros, blockNumber=self.block, blockHash=self.block_hash,
+                          transactionHash=self.tx, logIndex='0x5', removed=False,
+                          topics=[abi.event_topic('Withdrawal(address,uint256)'), '0x'+abi.enc_word(self.router)],
+                          data='0x'+abi.enc_word(self.amount))
+        self.receipt = dict(status='0x1', transactionHash=self.tx, blockHash=self.block_hash,
+                            blockNumber=self.block, logs=[self.event], **{'from':self.sender, 'to':self.router})
+        payout = {'type':'CALL', 'from':self.wpros, 'to':self.router, 'value':hex(self.amount), 'input':'0x'}
+        withdraw = {'type':'CALL', 'from':self.router, 'to':self.wpros, 'value':'0x0',
+                    'input':abi.calldata('withdraw(uint256)', self.amount), 'calls':[payout]}
+        self.trace = {'type':'CALL', 'from':self.sender, 'to':self.router, 'value':'0x0',
+                      'calls':[{'type':'STATICCALL', 'value':'0x0'} for _ in range(6)] + [withdraw,
+                        {'type':'CALL', 'from':self.router, 'to':self.sender, 'value':hex(self.amount)}]}
+        self.headers = {self.block:{'hash':self.block_hash}}
+        self.result = {'replay':{'migrations':[], 'supply':123, 'T':456, 'V':123, 'liability':7}}
+        self.finding = 'native-unclassified-' + self.tx + '-6.0'
+
+    def assess(self, identity=True):
+        from .assets import assess
+        return assess(self.inv, {self.tx:self.trace}, {self.tx:self.receipt}, self.result,
+                      wrapped_identity=identity, headers=self.headers)
+
+    def verified(self, result):
+        return [m for m in result['movements'] if m.get('unwrapStatus') == 'PASS']
+
+    def test_cached_transaction_shape_matches_unwrap_and_observed_forwarding(self):
+        import copy
+        before = copy.deepcopy(self.result)
+        result = self.assess()
+        self.assertNotIn(self.finding, [c['id'] for c in result['checks']])
+        self.assertEqual(len(self.verified(result)), 1)
+        unwrap, forwarded = result['movements']
+        self.assertEqual((unwrap['tracePath'], unwrap['value'], unwrap['withdrawalLogIndex']), ([6,0], self.amount, 5))
+        self.assertEqual((forwarded['tracePath'], forwarded['from'], forwarded['to'], forwarded['value']),
+                         ([7], self.router, self.sender, self.amount))
+        self.assertEqual(forwarded['relatedUnwrapTracePath'], [6,0])
+        self.assertTrue(all(m['economicAuthorization'] == 'UNVERIFIED' for m in result['movements']))
+        self.assertEqual(result['status'], 'UNVERIFIED')
+        self.assertIsNone(result['verifiedAttributableAssets'])
+        self.assertEqual(self.result, before)
+
+    def test_receipt_and_event_must_bind_to_successful_pinned_transaction(self):
+        import copy
+        receipt = copy.deepcopy(self.receipt)
+        for target, key, value in (
+                ('receipt','status','0x0'), ('receipt','transactionHash','0x'+'00'*32),
+                ('receipt','blockHash','other'), ('receipt','from',ZERO), ('receipt','to',ZERO),
+                ('event','transactionHash','0x'+'00'*32), ('event','blockHash','other'),
+                ('event','blockNumber','0x1'), ('event','removed',True)):
+            with self.subTest(target=target, key=key):
+                self.receipt = copy.deepcopy(receipt)
+                obj = self.receipt if target == 'receipt' else self.receipt['logs'][0]
+                obj[key] = value
+                result = self.assess()
+                self.assertFalse(self.verified(result))
+                self.assertIn(self.finding, [c['id'] for c in result['checks']])
+                self.assertTrue(all(c['status'] == 'UNVERIFIED' for c in result['checks']))
+
+    def test_runtime_identity_and_header_are_required(self):
+        self.assertFalse(self.verified(self.assess(identity=False)))
+        self.headers = {}
+        self.assertFalse(self.verified(self.assess()))
+        self.headers = {self.block:{'hash':'other'}}
+        self.assertFalse(self.verified(self.assess()))
+
+    def test_missing_or_wrong_emitter_event_does_not_suppress_outflow(self):
+        self.receipt['logs'] = []
+        self.assertIn(self.finding, [c['id'] for c in self.assess()['checks']])
+        self.event['address'] = ZERO
+        self.receipt['logs'] = [self.event]
+        self.assertIn(self.finding, [c['id'] for c in self.assess()['checks']])
+
+    def test_amount_recipient_caller_and_withdraw_call_must_all_match(self):
+        import copy
+        original_receipt, original_trace = copy.deepcopy(self.receipt), copy.deepcopy(self.trace)
+        for mismatch in ('amount','src','recipient','caller','callee','selector','call-amount','delegate-parent','delegate-payout'):
+            with self.subTest(mismatch=mismatch):
+                self.receipt, self.trace = copy.deepcopy(original_receipt), copy.deepcopy(original_trace)
+                event = self.receipt['logs'][0]; parent = self.trace['calls'][6]; payout = parent['calls'][0]
+                if mismatch == 'amount': event['data'] = '0x'+abi.enc_word(self.amount+1)
+                elif mismatch == 'src': event['topics'][1] = '0x'+abi.enc_word(self.sender)
+                elif mismatch == 'recipient': payout['to'] = self.sender
+                elif mismatch == 'caller': parent['from'] = ZERO
+                elif mismatch == 'callee': parent['to'] = ZERO
+                elif mismatch == 'selector': parent['input'] = '0x'
+                elif mismatch == 'call-amount': parent['input'] = abi.calldata('withdraw(uint256)', self.amount+1)
+                elif mismatch == 'delegate-parent': parent['type'] = 'DELEGATECALL'
+                else: payout['type'] = 'DELEGATECALL'
+                result = self.assess()
+                self.assertFalse(self.verified(result))
+                self.assertTrue(any(c['id'].startswith('wpros-unwrap-unverified-') and c['status'] == 'UNVERIFIED' for c in result['checks']))
+
+    def test_reverted_payout_ancestor_or_root_never_counts_as_unwrap(self):
+        import copy
+        original = copy.deepcopy(self.trace)
+        for level in ('payout','parent','root'):
+            with self.subTest(level=level):
+                self.trace = copy.deepcopy(original)
+                node = self.trace if level == 'root' else self.trace['calls'][6]
+                if level == 'payout': node = node['calls'][0]
+                node['error'] = 'execution reverted'
+                result = self.assess()
+                self.assertFalse(self.verified(result))
+                self.assertTrue(any(c['id'].startswith('wpros-unwrap-unverified-') for c in result['checks']))
+                self.assertFalse(any(m['from'] == self.wpros for m in result['movements']))
+
+    def test_one_event_cannot_classify_two_payouts(self):
+        import copy
+        self.trace['calls'].append(copy.deepcopy(self.trace['calls'][6]))
+        result = self.assess()
+        self.assertEqual(len(self.verified(result)), 1)
+        self.assertIn('native-unclassified-'+self.tx+'-8.0', [c['id'] for c in result['checks']])
+        self.receipt['logs'].append(dict(self.event, logIndex='0x6'))
+        result = self.assess()
+        self.assertEqual(len(self.verified(result)), 2)
+        self.assertEqual(len([m for m in result['movements'] if 'relatedUnwrapTracePath' in m]), 1)
+
+    def test_duplicate_event_index_cannot_create_extra_attribution(self):
+        import copy
+        self.receipt['logs'].append(copy.deepcopy(self.event))
+        result = self.assess()
+        self.assertFalse(self.verified(result))
+        self.assertIn(self.finding, [c['id'] for c in result['checks']])
+
+    def test_forwarding_requires_sender_amount_order_and_same_successful_frame(self):
+        import copy
+        original = copy.deepcopy(self.trace)
+        for mismatch in ('recipient','amount','before-unwrap','different-frame','reverted'):
+            with self.subTest(mismatch=mismatch):
+                self.trace = copy.deepcopy(original)
+                forwarded = self.trace['calls'][7]
+                if mismatch == 'recipient': forwarded['to'] = ZERO
+                elif mismatch == 'amount': forwarded['value'] = hex(self.amount-1)
+                elif mismatch == 'before-unwrap': self.trace['calls'].insert(0, self.trace['calls'].pop(7))
+                elif mismatch == 'different-frame': self.trace['calls'][7] = {'type':'CALL','value':'0x0','calls':[forwarded]}
+                else: forwarded['error'] = 'execution reverted'
+                result = self.assess()
+                self.assertEqual(len(self.verified(result)), 1)
+                self.assertFalse(any('relatedUnwrapTracePath' in m for m in result['movements']))
+
+    def test_protocol_outflow_is_not_relabelled_as_external_forwarding(self):
+        self.inv['targets'][self.router] = {'name':'Protocol custody'}
+        result = self.assess()
+        self.assertEqual(len(self.verified(result)), 1)
+        self.assertIn('native-unclassified-'+self.tx+'-7', [c['id'] for c in result['checks']])
+
+    def test_unrelated_native_outflows_are_preserved_even_for_equal_amount(self):
+        self.trace['calls'].append({'type':'CALL', 'from':self.inv['addresses']['proxies']['StPROS'].lower(),
+                                    'to':ZERO, 'value':hex(self.amount)})
+        result = self.assess()
+        self.assertEqual(len(self.verified(result)), 1)
+        finding = next(c for c in result['checks'] if c['id'] == 'native-unclassified-'+self.tx+'-8')
+        self.assertEqual(finding['status'], 'UNVERIFIED')

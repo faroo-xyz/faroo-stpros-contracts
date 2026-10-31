@@ -210,3 +210,15 @@ Resume with the same 100,000/5,000,000 CU limits and inherited `PHAROS_RPC_URL`:
 ```sh
 python3 -m tools.reconcile all --run-budget-cu 100000 --budget-cu 5000000
 ```
+
+### WPROS unwrap observations
+
+A WPROS native payout is classified as a verified unwrap only when the recorded
+runtime is verified and a successful, header-bound receipt contains a unique
+matching `Withdrawal(src, wad)` event. The successful trace must show the matching
+`src -> WPROS.withdraw(wad) -> src` CALL path; each event and payout is consumed once.
+Missing/mismatched/reverted evidence remains UNVERIFIED, and unrelated protocol
+outflows retain their findings. A later same-amount transfer from an external router
+to the transaction sender in the same CALL frame is recorded as an observed
+forwarding action, without certifying exclusive funding or economic authorization.
+Offline replay writes attempts; completed historical reports remain immutable.

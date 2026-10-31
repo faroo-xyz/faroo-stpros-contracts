@@ -87,7 +87,7 @@ def _offline(store, inv, blocker=None):
     wrapped_code = store.get('cache/snapshots/fixed-code-identities.json', {})
     wrapped_verified = wrapped_code.get('snapshot') == snap and wrapped_code.get('entries', {}).get('WPROS', {}).get('status') == 'PASS'
     result['assets'] = assess(inv, traces, receipts, result,
-                              store.get('cache/snapshots/migration-state.json'), logs, wrapped_verified)
+                              store.get('cache/snapshots/migration-state.json'), logs, wrapped_verified, headers=headers)
     result['checks'] += result['assets']['checks']
     result['paymentEvidence'] = payment_evidence(inv, result, receipts, traces)
     for check in result['checks']:

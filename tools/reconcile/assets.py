@@ -20,7 +20,89 @@ def native_movements(trace):
     return result
 
 
-def assess(inv, traces, receipts, replay_result, migration_states=None, logs=None, wrapped_identity=False):
+def wpros_unwrap_evidence(inv, tx, trace, receipt, moves, headers, wrapped_identity):
+    """One Withdrawal consumes one successful withdraw-call payout, within a pinned receipt.
+
+    Forwarding is only an observed later action in the external router's same CALL
+    frame. Equal amounts do not prove exclusive funding, ownership or authorization.
+    """
+    from tools.lib import abi
+    from .inventory import WPROS_ABI, decode
+    wpros = inv['addresses']['asset']['WPROS'].lower()
+    annotations, issues, events = {}, [], {}
+    duplicate = False
+    for row in receipt.get('logs', []):
+        if row.get('address', '').lower() != wpros:
+            continue
+        event = decode(row, WPROS_ABI)
+        if not event or event['name'] != 'Withdrawal':
+            continue
+        index = number(row['logIndex'])
+        duplicate |= index in events
+        events[index] = (row, event['args'])
+    if not events:
+        return annotations, issues
+    bound = (wrapped_identity and not duplicate and number(receipt.get('status', 0)) == 1 and
+             receipt.get('transactionHash', '').lower() == tx.lower() and receipt.get('blockHash') and
+             headers.get(hex(number(receipt['blockNumber'])), {}).get('hash') == receipt['blockHash'] and
+             bool(receipt.get('from')) and bool(receipt.get('to')) and
+             trace.get('from', '').lower() == receipt['from'].lower() and
+             trace.get('to', '').lower() == receipt['to'].lower() and not trace.get('error'))
+
+    def node(path):
+        value = trace
+        for index in path:
+            value = value['calls'][index]
+        return value
+
+    for index, (row, args) in sorted(events.items()):
+        src, amount = args['src'].lower(), args['wad']
+        event_bound = (bound and not row.get('removed') and
+                       row.get('transactionHash', '').lower() == tx.lower() and
+                       row.get('blockHash') == receipt['blockHash'] and
+                       number(row['blockNumber']) == number(receipt['blockNumber']))
+        match = None
+        for move in moves if event_bound else []:
+            path = tuple(move['tracePath'])
+            if path in annotations or not path or move['type'] != 'CALL' or (move['from'], move['to'], move['value']) != (wpros, src, amount):
+                continue
+            parent = node(path[:-1])
+            if (parent.get('type', '').upper() == 'CALL' and parent.get('from', '').lower() == src and
+                    parent.get('to', '').lower() == wpros and
+                    parent.get('input', '').lower() == abi.calldata('withdraw(uint256)', amount)):
+                match = move
+                break
+        if match is None:
+            issues.append(finding('wpros-unwrap-unverified-' + tx + '-' + str(index), 'UNVERIFIED',
+                'WPROS Withdrawal lacks a unique successful matching payout bound to the receipt, block header and withdraw call.',
+                actual={'src': src, 'wei': amount}, evidence=[tx, row], contract=wpros))
+            continue
+        path = tuple(match['tracePath'])
+        annotations[path] = {'classification': 'Verified WPROS unwrap movement',
+                             'withdrawalLogIndex': index, 'unwrapStatus': 'PASS',
+                             'economicAuthorization': 'UNVERIFIED'}
+        # Do not reclassify protocol outflows as router forwarding or conceal payment gaps.
+        if src in inv['targets'] or src in (wpros, STAKING) or len(path) < 2:
+            continue
+        frame_path = path[:-2]
+        frame = node(frame_path)
+        if frame.get('type', '').upper() != 'CALL' or frame.get('to', '').lower() != src:
+            continue
+        for forwarded in moves:
+            forward_path = tuple(forwarded['tracePath'])
+            if (forward_path and forward_path not in annotations and forward_path[:-1] == frame_path and
+                    forward_path[-1] > path[-2] and forwarded['type'] == 'CALL' and
+                    (forwarded['from'], forwarded['to'], forwarded['value']) == (src, receipt['from'].lower(), amount)):
+                annotations[forward_path] = {
+                    'classification': 'Observed external routing transfer to transaction sender after WPROS unwrap',
+                    'relatedUnwrapTracePath': list(path), 'withdrawalLogIndex': index,
+                    'fundingProvenance': 'UNVERIFIED; equal amounts do not prove exclusive funding',
+                    'economicAuthorization': 'UNVERIFIED'}
+                break
+    return annotations, issues
+
+
+def assess(inv, traces, receipts, replay_result, migration_states=None, logs=None, wrapped_identity=False, headers=None):
     known = set(inv['targets']) | {inv['addresses']['asset']['WPROS'].lower(), STAKING}
     movements, findings = [], []
     st = inv['addresses']['proxies']['StPROS'].lower()
@@ -31,12 +113,18 @@ def assess(inv, traces, receipts, replay_result, migration_states=None, logs=Non
             findings.append(finding('trace-without-receipt-' + tx, 'UNVERIFIED',
                                     'Trace cannot be bound to a successful pinned receipt.', evidence=[tx]))
             continue
-        for move in native_movements(trace):
-            if move['from'] not in known and move['to'] not in known:
+        native = native_movements(trace)
+        unwraps, unwrap_issues = wpros_unwrap_evidence(inv, tx, trace, receipts[tx], native, headers or {}, wrapped_identity)
+        findings.extend(unwrap_issues)
+        for move in native:
+            attribution = unwraps.get(tuple(move['tracePath']))
+            if move['from'] not in known and move['to'] not in known and not attribution:
                 continue
             move = dict(move, transaction=tx, block=receipts[tx]['blockNumber'],
                         classification='UNKNOWN economic purpose')
-            if move['from'] in known and move['to'] in known:
+            if attribution:
+                move.update(attribution)
+            elif move['from'] in known and move['to'] in known:
                 move['classification'] = 'Observed protocol/external-system transfer; economic classification pending'
             elif move['to'] in known:
                 move['classification'] = 'Observed external inflow; deposit/donation/principal/reward unresolved'
