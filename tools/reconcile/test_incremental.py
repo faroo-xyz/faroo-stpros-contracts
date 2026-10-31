@@ -332,76 +332,157 @@ class ExternalReuseTests(unittest.TestCase):
 
 
 class ExistingCacheTests(unittest.TestCase):
-    @unittest.skipUnless(Path('/Volumes/project/tmp/stpros-mainnet-reconciliation/output/reconciliation/DATA-MANIFEST.json').exists(), 'optional original audit cache not present')
+    def completed_cache(self, root):
+        """Build synthetic collected history; never read the mutable production cache."""
+        from .test_reconcile import test_inventory
+        from .inventory import scopes
+        from .__main__ import offline, output_dir
+        store = Store(root)
+        inv = copy.deepcopy(test_inventory())
+        old = snapshot(21647956)
+        plan = {'snapshot': old, 'scopes': scopes(inv), 'initialChunk': 1000, 'rangeCeiling': 1000}
+        store.put('cache/snapshots/inventory.json', inv)
+        store.put('checkpoints/plan.json', plan)
+        store.put('checkpoints/snapshot.json', old)
+        store.put('cache/snapshots/headers.json', {hex(old['number']): header(old['number'])})
+        for scope in plan['scopes']:
+            store.chunk(scope['id'], scope['start'], old['number'], old, [], {str(old['number']): old['hash']})
+        store.put('cache/snapshots/final-anchor-verification.json', {'snapshot': old, 'chainId': 1672, 'status': 'MATCH'})
+        result = offline(store, inv)
+        self.assertIsNone(result['executionBlocker'])
+        self.assertTrue(result['collectionComplete'])
+        for path in output_dir(store, plan).iterdir():
+            shutil.copyfile(path, store.root / 'output/reconciliation' / path.name)
+        boundary = incremental.bootstrap(store, plan)
+        return store, inv, plan, boundary
+
     def test_original_cache_mock_advance_and_deterministic_offline(self):
-        # Named evidence directories only; never copy/read project environment or credentials.
-        origin=Path('/Volumes/project/tmp/stpros-mainnet-reconciliation')
-        with tempfile.TemporaryDirectory() as temp:
-            dest=Path(temp)
-            for rel in ('cache','checkpoints','output/reconciliation'):
-                shutil.copytree(origin/rel,dest/rel)
-            store=Store(dest)
-            plan=store.get('checkpoints/plan.json'); old=plan['snapshot']; end=old['number']+3
-            before={p.name:digest(p.read_bytes()) for p in (dest/'output/reconciliation').glob('*') if p.is_file()}
-            boundary=incremental.bootstrap(store,plan)
-            calls=[]
-            headers=store.get('cache/snapshots/headers.json')
-            def transport(m,p):
-                calls.append((m,p))
-                if m=='eth_chainId':return '0x688'
-                if m=='eth_blockNumber':return hex(end+1)
-                if m=='eth_getLogs':return []
-                if m=='eth_getBlockByNumber':
-                    n=end if p[0]=='finalized' else int(p[0],16)
-                    if hex(n) in headers:return headers[hex(n)]
-                    h=header(n)
-                    if n==old['number']+1:h['parentHash']=old['hash']
-                    return h
-                raise AssertionError(m)
-            inv=store.get('cache/snapshots/inventory.json')
-            c=Collector(store,Rpc(store,interval=0,transport=transport),inv)
-            advanced=c.preflight(advance=True);c.sync(advanced)
-            self.assertEqual(advanced['snapshot']['number'],end)
-            self.assertTrue(cached_logs(store,advanced)[2])
-            ranges=[p[0] for m,p in calls if m=='eth_getLogs']
-            self.assertEqual(len(ranges),len(plan['scopes']))
-            self.assertTrue(all(int(r['fromBlock'],16)==21647957 for r in ranges))
-            self.assertFalse(any(m in ('debug_traceTransaction','eth_call','eth_getCode') for m,p in calls))
-            from .__main__ import offline, output_dir
-            # Intentionally omit new state/tx attestations; offline cannot inherit PASS.
-            result=offline(store,inv)
-            self.assertIsNone(result['executionBlocker'])
-            self.assertFalse(result['externalState'])
-            self.assertTrue(all(r['status']=='UNVERIFIED' for r in result['checks'] if r['id'].startswith('external-runtime-')))
-            self.assertEqual(result['rewardProvenance']['status'],'UNVERIFIED')
-            path=output_dir(store,advanced)/'RECONCILIATION-RESULTS.json'
-            first=path.read_bytes();offline(store,inv);self.assertEqual(first,path.read_bytes())
-            self.assertEqual(before,{p.name:digest(p.read_bytes()) for p in (dest/'output/reconciliation').glob('*') if p.is_file()})
-            incremental.validate_boundary(store,boundary)
-            # Exercise the public all/reconcile commands with deliberately unavailable current
-            # contract evidence. Collection can finish, but identity/backing must not become PASS.
-            def full_transport(m,p):
-                if m=='eth_call':raise RpcError('unsupported')
-                if m=='eth_getCode':return '0x'
-                if m=='eth_getStorageAt':return '0x'+'00'*32
-                if m=='eth_getBalance':return '0x0'
-                return transport(m,p)
-            from .__main__ import main
-            def client(s,budget,interval,**kwargs):
-                return Rpc(s,budget,0,transport=full_transport,**kwargs)
-            with patch('tools.reconcile.__main__.Rpc',side_effect=client), patch('builtins.print'):
-                code=main(['all','--advance','--data-dir',str(dest)])
-            self.assertEqual(code,0)
-            published=incremental.report_dir(store,advanced['snapshot'])/'RECONCILIATION-RESULTS.json'
-            completed=read(published)
-            self.assertTrue(completed['collectionComplete'])
-            self.assertEqual(completed['rewardProvenance']['status'],'UNVERIFIED')
-            self.assertTrue(all(r['status']=='BLOCKED' for r in completed['checks'] if r['id'].startswith('external-runtime-')))
-            saved=published.read_bytes()
-            with patch('tools.reconcile.__main__.Rpc',side_effect=AssertionError('offline RPC forbidden')), patch('builtins.print'):
-                self.assertEqual(main(['reconcile','--data-dir',str(dest)]),0)
-            self.assertEqual(saved,published.read_bytes())
-            self.assertEqual(before,{p.name:digest(p.read_bytes()) for p in (dest/'output/reconciliation').glob('*') if p.is_file()})
+        from .__main__ import main, offline, output_dir
+        # Independent starting states: completed history may advance; pending history
+        # must resume even when the provider could advertise a newer finalized block.
+        for pending in (False, True):
+            with self.subTest(pending=pending), tempfile.TemporaryDirectory() as temp:
+                store, inv, plan, boundary = self.completed_cache(Path(temp))
+                old = plan['snapshot']
+                end = 21737768 if pending else old['number'] + 3
+                advertised = end + 3 if pending else end
+                vault = next(a for a, t in inv['targets'].items() if 'RewardsVault' in t['name'])
+                slp = inv['addresses']['slpDestinations'][0].lower()
+                row = log(end, address=vault)
+                row.update(topics=[abi.event_topic('EthDeposited(address,uint256)'), '0x' + abi.enc_word(slp)],
+                           data='0x' + abi.enc_word(10))
+                tx = row['transactionHash']
+
+                def selected(filt):
+                    addresses = filt['address'] if isinstance(filt['address'], list) else [filt['address']]
+                    return [row] if vault in addresses and int(filt['fromBlock'],16) <= end <= int(filt['toBlock'],16) else []
+
+                if pending:
+                    # Event-complete but receipt-incomplete pending snapshot, explicitly
+                    # constructed independently of the operator's real progress.
+                    pending_plan = dict(plan, snapshot=snapshot(end), historicalBoundary=incremental.identity(old))
+                    store.put('checkpoints/plan.json', pending_plan)
+                    store.put('checkpoints/snapshot.json', snapshot(end))
+                    store.put('cache/snapshots/headers.json', {hex(n): header(n) for n in (old['number'], end)})
+                    for scope in plan['scopes']:
+                        filt = dict(scope['filter'], fromBlock=hex(old['number']+1), toBlock=hex(end))
+                        store.chunk(scope['id'], old['number']+1, end, snapshot(end), selected(filt), {str(end): header(end)['hash']})
+                before = {str(p.relative_to(store.root)): p.read_bytes()
+                          for p in (store.root / 'output/reconciliation').rglob('*') if p.is_file()}
+                calls = []
+
+                def transport(method, params):
+                    calls.append((method, params))
+                    if method == 'eth_chainId': return '0x688'
+                    if method == 'eth_blockNumber': return hex(advertised+1)
+                    if method == 'eth_getBlockByNumber':
+                        return header(advertised if params[0] == 'finalized' else int(params[0],16))
+                    if method == 'eth_getLogs': return selected(params[0])
+                    raise AssertionError(method)
+
+                c = Collector(store, Rpc(store, interval=0, transport=transport), inv)
+                advanced = c.preflight(advance=True)
+                c.sync(advanced)
+                self.assertEqual(advanced['snapshot'], snapshot(end))
+                self.assertEqual(advanced['historicalBoundary'], incremental.identity(old))
+                self.assertTrue(cached_logs(store, advanced)[2])
+                ranges = [p[0] for m,p in calls if m == 'eth_getLogs']
+                if pending:
+                    self.assertEqual(ranges, [])
+                    self.assertFalse(any(m == 'eth_blockNumber' or (m == 'eth_getBlockByNumber' and p[0] == 'finalized') for m,p in calls))
+                else:
+                    self.assertEqual(len(ranges), len(plan['scopes']))
+                    self.assertTrue(all((int(r['fromBlock'],16), int(r['toBlock'],16)) == (old['number']+1,end) for r in ranges))
+                    self.assertIn(('eth_getBlockByNumber', ['finalized', False]), calls)
+                self.assertFalse(any(m in ('debug_traceTransaction','eth_call','eth_getCode') for m,p in calls))
+
+                result = offline(store, inv)
+                self.assertIsNone(result['executionBlocker'])
+                self.assertFalse(result['externalState'])
+                runtime_checks = [r for r in result['checks'] if r['id'].startswith('external-runtime-')]
+                self.assertTrue(runtime_checks)
+                self.assertTrue(all(r['status'] == 'UNVERIFIED' for r in runtime_checks))
+                self.assertFalse(result['requiredEvidenceComplete'])
+                self.assertEqual(result['transactionEvidence']['missingReceipts'], [tx])
+                self.assertEqual(result['transactionEvidence']['missingRequiredTraces'], [tx])
+                path = output_dir(store, advanced) / 'RECONCILIATION-RESULTS.json'
+                first = path.read_bytes()
+                offline(store, inv)
+                self.assertEqual(first, path.read_bytes())
+                published = incremental.report_dir(store, advanced['snapshot']) / 'RECONCILIATION-RESULTS.json'
+                self.assertFalse(published.exists())
+
+                def full_transport(method, params):
+                    if method == 'eth_call': raise RpcError('unsupported')
+                    if method == 'eth_getCode': return '0x'
+                    if method == 'eth_getStorageAt': return '0x' + '00'*32
+                    if method == 'eth_getBalance': return '0x0'
+                    if method == 'eth_getTransactionReceipt':
+                        calls.append((method, params))
+                        self.assertEqual(params, [tx])
+                        return {'blockNumber': row['blockNumber'], 'blockHash': row['blockHash'], 'status':'0x1', 'logs':[row]}
+                    if method == 'eth_getTransactionByHash':
+                        calls.append((method, params))
+                        return {'blockHash': row['blockHash'], 'from':slp, 'to':vault, 'input':'0x'}
+                    if method == 'debug_traceTransaction':
+                        calls.append((method, params))
+                        self.assertEqual(store.get('cache/receipts/' + tx + '.json')['status'], '0x1')
+                        self.assertEqual(store.get('cache/receipts/' + tx + '-transaction.json')['blockHash'], row['blockHash'])
+                        return {'type':'CALL', 'from':slp, 'to':vault, 'value':'0xa'}
+                    return transport(method, params)
+
+                def client(s, budget, interval, **kwargs):
+                    return Rpc(s, budget, 0, transport=full_transport, **kwargs)
+
+                calls.clear()
+                with patch('tools.reconcile.__main__.Rpc', side_effect=client), patch('builtins.print'):
+                    # Neither receipt-cap nor trace-cap exhaustion may finalize this snapshot.
+                    for limits, missing_receipts in ((['--max-receipts','0'], [tx]), (['--max-traces','0'], [])):
+                        self.assertEqual(main(['all','--advance','--data-dir',temp] + limits), 2)
+                        attempt = read(path)
+                        self.assertTrue(attempt['collectionComplete'])
+                        self.assertFalse(attempt['requiredEvidenceComplete'])
+                        self.assertEqual(attempt['transactionEvidence']['missingReceipts'], missing_receipts)
+                        self.assertEqual(attempt['transactionEvidence']['missingRequiredTraces'], [tx])
+                        self.assertFalse(published.exists())
+                        self.assertEqual(incremental.load_boundary(store)['snapshot'], old)
+                    self.assertEqual(main(['all','--advance','--data-dir',temp]), 0)
+                self.assertFalse(any(m in ('eth_getLogs','eth_blockNumber') or (m == 'eth_getBlockByNumber' and p[0] == 'finalized') for m,p in calls))
+                self.assertEqual([m for m,p in calls if m.startswith('eth_getTransaction') or m == 'debug_traceTransaction'],
+                                 ['eth_getTransactionReceipt','eth_getTransactionByHash','debug_traceTransaction'])
+                completed = read(published)
+                self.assertTrue(completed['collectionComplete'])
+                self.assertTrue(completed['requiredEvidenceComplete'])
+                self.assertEqual(completed['rewardProvenance']['status'], 'UNVERIFIED')
+                self.assertTrue(all(r['status'] == 'UNVERIFIED' for r in completed['checks'] if r['id'].startswith('external-runtime-')))
+                self.assertEqual(incremental.load_boundary(store)['snapshot'], snapshot(end))
+                saved = published.read_bytes()
+                with patch('tools.reconcile.__main__.Rpc', side_effect=AssertionError('offline RPC forbidden')), patch('builtins.print'):
+                    self.assertEqual(main(['reconcile','--data-dir',temp]), 0)
+                self.assertEqual(saved, published.read_bytes())
+                for relative, content in before.items():
+                    self.assertEqual(content, (store.root / relative).read_bytes())
+                incremental.validate_boundary(store, boundary)
 
 
 if __name__ == '__main__':
