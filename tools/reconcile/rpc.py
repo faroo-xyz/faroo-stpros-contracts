@@ -15,6 +15,9 @@ WEIGHTS = {'eth_chainId': 20, 'eth_blockNumber': 20, 'eth_getBlockByNumber': 40,
            'eth_call': 100, 'eth_getLogs': 150, 'eth_getTransactionReceipt': 100,
            'eth_getTransactionByHash': 100, 'debug_traceTransaction': 10000}
 
+# Owner-authorized explicit override; the default cumulative budget stays 5,000,000.
+MAX_BUDGET_CU = 6_000_000
+
 
 class BudgetExceeded(EvidenceError):
     pass
@@ -36,7 +39,7 @@ class Rpc:
         self.store, self.budget, self.interval = store, budget, interval
         self.ledger = store.get('checkpoints/rpc-usage.json',
                                 {'requests': 0, 'estimatedCU': 0, 'methods': {}, 'errors': {}, 'retries': 0})
-        if not 0 < budget <= 5_000_000 or run_budget <= 0:
+        if not 0 < budget <= MAX_BUDGET_CU or run_budget <= 0:
             raise EvidenceError('invalid RPC budget')
         self.run_budget = run_budget
         self.run_id = uuid.uuid4().hex

@@ -10,7 +10,7 @@ from zoneinfo import ZoneInfo
 from pathlib import Path
 from .storage import Store, EvidenceError, canonical, digest, atomic, write, safe
 from .inventory import discover, abi_hashes, source_binding, number, ROOT
-from .rpc import Rpc, BudgetExceeded, load_project_rpc_override
+from .rpc import Rpc, BudgetExceeded, load_project_rpc_override, MAX_BUDGET_CU
 from .collect import Collector, cached_logs, transaction_readiness, usable_trace
 from .replay import replay, finding
 from .assets import assess, payment_evidence, provisional_coverage
@@ -384,8 +384,8 @@ def main(argv=None):
     parser.add_argument('--advance', action='store_true')
     parser.add_argument('--rpc-from-project-env', action='store_true', help='Explicitly authorized extraction of only PHAROS_RPC_URL from this project .env; never sourced')
     args = parser.parse_args(argv)
-    if not 1 <= args.budget_cu <= 5_000_000 or args.run_budget_cu < 1 or not 1 <= args.chunk <= 5000 or args.fallback_depth < 1 or args.request_interval < 0.25 or min(args.max_receipts, args.max_traces) < 0:
-        parser.error('unsafe limits; budget cannot exceed 5,000,000 CU')
+    if not 1 <= args.budget_cu <= MAX_BUDGET_CU or args.run_budget_cu < 1 or not 1 <= args.chunk <= 5000 or args.fallback_depth < 1 or args.request_interval < 0.25 or min(args.max_receipts, args.max_traces) < 0:
+        parser.error(f'unsafe limits; budget cannot exceed {MAX_BUDGET_CU:,} CU')
     data_root = safe(args.data_dir).resolve()
     if data_root == ROOT or ROOT in data_root.parents:
         parser.error('raw data must remain outside the production repository')

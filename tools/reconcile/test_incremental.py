@@ -242,6 +242,36 @@ class RunBudgetTests(unittest.TestCase):
     def setUp(self):
         self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup);self.store=Store(self.tmp.name)
 
+    def test_explicit_six_million_cap_preserves_ledger_and_default(self):
+        self.store.put('checkpoints/rpc-usage.json', dict(requests=10, estimatedCU=5_999_980,
+                                                       methods={}, errors={}, retries=0))
+        calls = []
+        transport = lambda m,p: calls.append(m) or '0x688'
+        default = Rpc(self.store, interval=0, transport=transport)
+        self.assertEqual(default.budget, 5_000_000)
+        with self.assertRaises(BudgetExceeded): default.call('eth_chainId', [])
+        self.assertEqual(calls, [])
+        authorized = Rpc(self.store, budget=6_000_000, interval=0, transport=transport)
+        authorized.call('eth_chainId', [])
+        with self.assertRaises(BudgetExceeded): authorized.call('eth_chainId', [])
+        self.assertEqual(calls, ['eth_chainId'])
+        self.assertEqual(self.store.get('checkpoints/rpc-usage.json')['estimatedCU'], 6_000_000)
+        self.assertEqual(self.store.get('checkpoints/rpc-usage.json')['requests'], 11)
+        with self.assertRaises(EvidenceError):
+            Rpc(self.store, budget=6_000_001, interval=0, transport=transport)
+
+    def test_cli_accepts_authorized_cap_and_rejects_excess_offline(self):
+        import contextlib
+        import io
+        from .__main__ import main
+        with patch('tools.reconcile.__main__.Rpc', side_effect=AssertionError('unexpected RPC')), patch('builtins.print'):
+            self.assertEqual(main(['status', '--data-dir', self.tmp.name, '--budget-cu', '6000000']), 0)
+            errors = io.StringIO()
+            with contextlib.redirect_stderr(errors), self.assertRaises(SystemExit) as caught:
+                main(['status', '--data-dir', self.tmp.name, '--budget-cu', '6000001'])
+            self.assertEqual(caught.exception.code, 2)
+            self.assertIn('6,000,000 CU', errors.getvalue())
+
     def test_per_run_and_cumulative_are_independent(self):
         self.store.put('checkpoints/rpc-usage.json',dict(requests=100,estimatedCU=2_960_000,methods={},errors={},retries=0))
         rpc=Rpc(self.store,interval=0,transport=lambda m,p:'ok',run_budget=40)

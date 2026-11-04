@@ -47,8 +47,10 @@ to 1,000 blocks, including previously learned larger limits; smaller learned lim
 are retained. The legacy `--chunk` option is accepted but capped at 1,000 at runtime. At most ten read requests share an HTTP
 batch; every item, failed request and retry is charged independently. Traces are
 sequential, with a conservative estimate of 10,000 CU each. Weights are in `rpc.py`;
-they are internal estimates, not Alchemy's actual invoice. `--budget-cu` may lower the
-ceiling but cannot raise it above 5,000,000. `--run-budget-cu` explicitly sets the
+they are internal estimates, not Alchemy's actual invoice. `--budget-cu` defaults to
+5,000,000 and accepts an explicitly owner-authorized override up to 6,000,000.
+The owner authorized that higher ceiling on 2026-11-04 for the multi-day backfill;
+no ledger, weight or evidence requirement is reset or relaxed. `--run-budget-cu` explicitly sets the
 independent per-invocation ceiling (default 100,000); neither ceiling increases automatically.
 Default per-run caps are 2,000 new receipt/transaction pairs
 and 40 new traces; cached evidence does not consume these caps. `--max-receipts`, `--max-traces`, `--request-interval`, `--chunk` and
@@ -187,8 +189,9 @@ historical ledger is never reset. Each attempt (including retries and failed req
 is charged before sending; a batch reserves its full estimated cost before transmission.
 The run checkpoint and `output/rpc-usage/runs/<run-id>.json` retain usage per invocation.
 Reaching either ceiling preserves published chunks/checkpoints and writes an incomplete
-attempt; rerun the same command to resume under a new run allowance. The cumulative
-5,000,000-CU cap still applies across every invocation. Estimates are not provider bills.
+attempt; rerun the same command to resume under a new run allowance. The
+selected cumulative cap still applies across every invocation (default 5,000,000;
+explicit authorized maximum 6,000,000). Estimates are not provider bills.
 
 Development acceptance uses synthetic transports and an isolated copy of the existing
 cache when present. No live mainnet advance, Foundry, Hardhat or full CI is required.
