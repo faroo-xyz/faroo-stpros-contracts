@@ -19,3 +19,10 @@ upgrade-rehearsal:
 	tools/verify/run.sh "$$dest" python3 tools/ci/canonical.py; \
 	tools/verify/run.sh "$$dest" FOUNDRY_PROFILE=final forge test --offline --match-contract 'Anvil.*Fixture' --match-test '^test_exportAnvil' -vv; \
 	tools/verify/run.sh "$$dest" python3 tests/release/native/rehearsal.py
+
+# Independent SLP module gates; existing core and owner targets stay separate.
+.PHONY: slp-build slp-test slp-verify
+slp-build slp-test slp-verify:
+	@set -euo pipefail; dest=$$(tools/verify/export.sh | tail -1); \
+	tools/verify/run.sh "$$dest" bash slp/tools/check.sh $(patsubst slp-%,%,$@); \
+	echo "SLP evidence: $$dest"

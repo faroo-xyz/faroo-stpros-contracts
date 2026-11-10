@@ -114,7 +114,8 @@ are unresolved; do not modify tickets to force resumption.
 
 ## SLP layer incidents
 
-The SLP execution contracts and the RewardsVault are administered by the SLP administrator, outside the Timelock
+The SLP execution contracts and RewardsVault have Timelock administrators and a separate Timelock-owned ProxyAdmin
+(current SLP baseline: block 22640026; the pre-21585015 external-admin window is historical)
 ([SLP-STAKING.md](SLP-STAKING.md#changeable-by-governance-or-by-the-slp-administrator)). From the core contracts,
 governance can:
 - pause the SlpDistributor (Guardian) to stop all keeper allocations;
@@ -125,7 +126,7 @@ governance can:
 If principal reached the RewardsVault, it must not be reported. Pause the Oracle before the next `notifyOracle()`:
 `Oracle.update` reverts while the Oracle is paused, so the balance cannot be reported. `notifyOracle()` is the
 RewardsVault's only outflow ([SLP-STAKING.md](SLP-STAKING.md#known-risk-principal-reported-as-yield)); any other remedy
-is in the hands of the SLP administrator, outside the Timelock. The core contracts cannot recover funds held by the SLP
+requires separately reviewed Timelock governance of the SLP layer. There is no generic safe principal withdrawal from RewardsVault. The core contracts cannot recover funds held by the SLP
 contracts.
 
 ## YieldVault incidents

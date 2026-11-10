@@ -98,7 +98,7 @@ a silently substituted ABI.
 ## Fixed-snapshot P0 evidence closeout
 
 ```sh
-python3 -m tools.reconcile closeout --slp-repo /Volumes/project/workspace/vETH-3.0-contract
+python3 -m tools.reconcile closeout --slp-repo /path/to/explicit-legacy-origin-checkout
 python3 -m unittest tools.reconcile.test_closeout -v
 ```
 
@@ -225,3 +225,23 @@ outflows retain their findings. A later same-amount transfer from an external ro
 to the transaction sender in the same CALL frame is recorded as an observed
 forwarding action, without certifying exclusive funding or economic authorization.
 Offline replay writes attempts; completed historical reports remain immutable.
+
+
+## Local SLP recorded-build provider
+
+Fixed-snapshot `closeout` defaults to this repository's `slp/` module. It verifies
+frozen origin/dependency/build manifests, all original record and source hashes,
+canonical implementation ABI (including both InsufficientBalance overloads), full
+runtime and metadata, then binds all three proxy identities to the original
+21647956 block/hash, deployment receipts and upgrade history. Original Git commits
+remain origin facts; they are not attributed to this repository. No external
+checkout, compilation or RPC is required by this provider.
+
+`--slp-repo /path/to/explicit-legacy-origin-checkout` retains Git-backed archival
+reproduction. The default never reads retired root SLP sources. Unknown routing
+contracts receive no business ABI. Recorded ABI selection alone does not confer
+current-runtime authentication: incremental consumers still require exact current
+slot/runtime/history evidence and discard business ABI otherwise. No live chain
+pin, routing/role profile, reward formula or confidence rule is advanced here.
+Frozen historical checker excerpts preserve the old operational discrepancy;
+they are evidence, not a restored operational CLI.

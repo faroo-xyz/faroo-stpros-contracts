@@ -101,8 +101,11 @@ contract SlpPharosRewardsVault is AccessControlEnumerableUpgradeable, Reentrancy
 
     /// @notice Notifies the oracle with the current balance of the contract.
     /// @dev Only accounts with the WHITELIST_ROLE can call this function.
+    /// @dev Reverts with InvalidAddress if slpPharosProxy has not been set yet, so the balance can never be
+    ///      forwarded to the zero address (initialize leaves it unset; it is wired via setSlpPharosProxy).
     function notifyOracle() external nonReentrant onlyRole(WHITELIST_ROLE) {
         SlpPharosRewardsVaultStorage storage $ = getSlpPharosRewardsVaultStorage();
+        require($._slpPharosProxy != address(0), InvalidAddress());
         uint256 amount = address(this).balance;
         IOracle($._vTokenOracle).update($._WPROS, amount);
         Address.sendValue(payable($._slpPharosProxy), amount);
@@ -111,7 +114,7 @@ contract SlpPharosRewardsVault is AccessControlEnumerableUpgradeable, Reentrancy
     }
 
     /// @notice Sets the slpPharosProxy address
-    /// @param _slpPharosProxy The new slpPharosProxy address.
+    /// @param _slpPharosProxy The new slpPharosProxy address, must not be the zero address.
     /// @dev Only accounts with the DEFAULT_ADMIN_ROLE can call this function.
     function setSlpPharosProxy(address _slpPharosProxy) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _setSlpPharosProxy(_slpPharosProxy);
@@ -137,8 +140,10 @@ contract SlpPharosRewardsVault is AccessControlEnumerableUpgradeable, Reentrancy
 
     /// @notice Internal function to set the slpPharosProxy address.
     /// @param _slpPharosProxy The new slpPharosProxy address.
+    /// @dev Reverts with InvalidAddress for the zero address.
     /// @dev Emits a SlpPharosProxySet event upon successful update.
     function _setSlpPharosProxy(address _slpPharosProxy) private {
+        require(_slpPharosProxy != address(0), InvalidAddress());
         SlpPharosRewardsVaultStorage storage $ = getSlpPharosRewardsVaultStorage();
         $._slpPharosProxy = _slpPharosProxy;
 

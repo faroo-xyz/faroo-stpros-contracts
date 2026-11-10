@@ -28,7 +28,7 @@ flowchart TB
         BV["BridgeVault<br/>redemption liquidity"]
         SD["SlpDistributor<br/>keeper allocation"]
     end
-    subgraph SLP["SLP layer (administered outside this repository's release process)"]
+    subgraph SLP["SLP layer (slp/ module; separate Timelock-owned ProxyAdmin)"]
         SP["SlpPharosProxy"]
         RV["SlpPharosRewardsVault<br/>(Oracle reporter)"]
     end
@@ -42,11 +42,10 @@ flowchart TB
     ST -- "deposited PROS" --> SD
     SD -- "principal" --> SP
     SD -- "redemption liquidity" --> BV
-    SD -- "reconciled rewards only" --> RV
     SP -- "delegate" --> PS
     PS -- "claimStake" --> SP
     SP -- "transferBack" --> SD
-    SP -- "claimed rewards" --> RV
+    SP -- "later transferToRewardsVault" --> RV
     RV -- "reported PROS" --> SP
     RV -. "update" .-> OR
     ST -. "onMint / onRedeem / rate" .-> OR
@@ -146,12 +145,13 @@ or in the BridgeVault.
   contract.
 - The distributor does not distinguish principal from rewards. Funds returned from staking land here too.
 
-Mainnet whitelist order: SLP execution contract #1, SLP execution contract #2, the BridgeVault, the RewardsVault.
+At the 2026-11-10 SLP baseline, the three whitelist members are SLP0, SLP1 and BridgeVault. RewardsVault was removed
+at block 22235165. The four-member list in the V4 release records is historical.
 [SLP-STAKING.md](SLP-STAKING.md) explains which funds may go to which destination.
 
 ### SlpPharosProxy
 
-`SlpPharosProxy` (`contracts/SlpPharosProxy.sol`) delegates PROS to Pharos validator pools through the Pharos Staking
+`SlpPharosProxy` (`slp/contracts/pharos/SlpPharosProxy.sol`) delegates PROS to Pharos validator pools through the Pharos Staking
 system contract at `0x4100000000000000000000000000000000000000`: bond, unbond, claim stake, claim and settle rewards.
 Returned stake leaves through `transferBack` to its configured return address. On mainnet the return address
 (`getBridgeVault()`) is the **SlpDistributor**. Rewards go to the RewardsVault. Details:
@@ -159,14 +159,14 @@ Returned stake leaves through `transferBack` to its configured return address. O
 
 ### SlpPharosRewardsVault
 
-`SlpPharosRewardsVault` (`contracts/SlpPharosRewardsVault.sol`) is the mainnet Oracle reporter. `notifyOracle()` reports
+`SlpPharosRewardsVault` (`slp/contracts/pharos/SlpPharosRewardsVault.sol`) is the mainnet Oracle reporter. `notifyOracle()` reports
 its **entire native balance** to `Oracle.update` and forwards that amount to its SlpPharosProxy. The contract does not
 know whether its balance is reward; operations must keep principal out of it
 ([SLP-STAKING.md](SLP-STAKING.md#security-and-trust-assumptions)).
 
 The two SLP contracts are not part of the canonical V4 build or of the `a110037` core audit package, and are not
 externally audited ([audit scope](../README.md#audit-scope)). Their mainnet instances are
-upgradeable proxies with their own administrator. See [deployment status](SLP-STAKING.md#deployment-status).
+upgradeable proxies with a separate Timelock-owned ProxyAdmin. Their exact-byte build is maintained in `slp/`. See [deployment status](SLP-STAKING.md#deployment-status).
 
 ### YieldVaultFactory and YieldVault
 
@@ -292,10 +292,11 @@ sequenceDiagram
     participant RV as RewardsVault
     participant OR as Oracle
     participant ST as StPROS
-    Op->>SP: claimRewardToRewardsVault(poolId)
+    Op->>SP: claimReward(poolId) / batchClaimReward
     SP->>PS: claimReward(poolId)
-    PS-->>SP: rewards
-    SP->>RV: rewards (native PROS)
+    PS-->>SP: node-generated credit after transaction (fork limitation)
+    Op->>SP: later transferToRewardsVault(reconciledAmount)
+    SP->>RV: reconciled rewards (native PROS)
     Op->>RV: notifyOracle()
     RV->>OR: update(WPROS, balance)
     OR->>OR: checks: interval, APR allowance, absolute cap

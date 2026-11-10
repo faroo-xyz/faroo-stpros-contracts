@@ -57,7 +57,7 @@ Addresses are authoritative in [`deployments/mainnet/v4/addresses.json`](../depl
 | **Keeper** | `0x8736e68f37c1156e09445ac2d395a139e58fcab4` | `SlpDistributor.distribute` to whitelisted destinations. Also `WHITELIST_ROLE` on the SLP contracts and the RewardsVault | SlpDistributor: Timelock (`setKeeper`). SLP roles: the SLP administrator | Cannot change the whitelist. See [SLP-STAKING.md](SLP-STAKING.md#keeper-responsibilities) |
 | **Oracle reporter** | `0xd0c44d3079e97ff285dd7a3e4e0246320a9487e5` (SlpPharosRewardsVault) | `Oracle.update`: add bounded yield | Timelock: `Oracle.setSlp(address)` | Bounded by the interval, APR allowance and absolute cap ([PARAMETERS.md](PARAMETERS.md#oracle-and-yield-reporting)) |
 | **Treasury** | `0x3754fd5ec997c07ca528bb0bdcb0b4f5b93605df` | Receives commission shares. Counterparty and fee recipient of YieldVault 001 | Commission recipient: Timelock (`setCommissionConfig`). Vault counterparty: fixed at vault creation | No protocol permissions. An account without contract code at block 20,815,667 |
-| **SLP administrator** | `0x976cf43c894ba43cf096da8c1427f6a51b724bb9` | `DEFAULT_ADMIN_ROLE` of both SLP execution contracts and the RewardsVault; owner of their ProxyAdmin `0x480eb384681777bf21e72b8c8538987c2801b4b7` | Itself | **Outside the Timelock.** A single account without contract code (block 20,817,024). See [SLP-STAKING.md](SLP-STAKING.md#changeable-by-governance-or-by-the-slp-administrator) |
+| **SLP administrator** | Timelock `0xc30db0543412c6881a543390d2c21fbbff42805b` | Sole `DEFAULT_ADMIN_ROLE` on SLP0, SLP1 and RewardsVault; owner of separate ProxyAdmin `0x480eb384681777bf21e72b8c8538987c2801b4b7` | Timelock governance | Migrated at block 21585015; reverified at block 22640026. The former EOA control at 20817024 is historical |
 
 ### Timelock role matrix
 
@@ -91,7 +91,7 @@ grants to other accounts are visible only through `RoleGranted` / `RoleRevoked` 
 | Fund a PROFIT proposal, finalize a settlement, force a par settlement after the deadline | Anyone | `fundProfit`, `finalize`, `forceParSettlement` |
 | Propose and execute Timelock operations | GOV Safe | `schedule` / `scheduleBatch`, then `execute` / `executeBatch` |
 | Cancel a pending Timelock operation | GOV Safe or CAN Safe | `cancel(id)` |
-| Change SLP pool lists, operators, return addresses, implementations | SLP administrator | SLP contract roles and their ProxyAdmin. **Not part of the Timelock system** |
+| Change SLP operators, return addresses, implementations | Timelock | SLP administrator roles and separate Timelock-owned ProxyAdmin; pool membership remains Keeper-operated |
 
 ### Two-stage Safe and Timelock execution
 
@@ -133,7 +133,7 @@ do not appear in its events.
 | Vault round operations: `openNextRound`, `extendOpenPeriod`, PROFIT `proposeSettlement`, cancelling a non-LOSS proposal | OPS (`OPERATOR_ROLE`, currently the GOV Safe through its own Safe transactions) | Within the vault's constants and the Factory-approved fee; no LOSS authority |
 | `SlpDistributor.distribute` | Keeper | Only to whitelisted destinations, from the distributor's balance, while unpaused |
 | `Oracle.update` (through `notifyOracle`) | Oracle reporter and its operators | Bounded by the interval, APR allowance and absolute cap |
-| SLP pool, operator and return-address management | SLP administrator and `WHITELIST_ROLE` holders | Outside the Timelock system ([SLP-STAKING.md](SLP-STAKING.md)) |
+| SLP pool registration and removal | `WHITELIST_ROLE` (Keeper) | Immediate; operator grants and return-address setters require the Timelock administrator ([SLP-STAKING.md](SLP-STAKING.md)) |
 | Deposits, redemption requests, claims, vault deposits and redemptions, `fundProfit`, `finalize`, `forceParSettlement`, `unwrapWrapped` | Any user, under each function's own conditions | No governance authority |
 
 ### Timelock delay
@@ -175,7 +175,7 @@ release tooling.
 Safe `getOwners()` at block 20,815,667:
 - the CAN Safe and the Guardian Safe have the same five owners;
 - the GOV Safe shares two owners with them;
-- one of those shared owners, `0x976c…4bb9`, is also the SLP administrator.
+- one of those shared owners, `0x976c…4bb9`, was the SLP administrator at that historical observation. SLP authority moved to Timelock at block 21585015.
 
 The roles are separated at contract level, but they are not held by fully independent signer groups.
 

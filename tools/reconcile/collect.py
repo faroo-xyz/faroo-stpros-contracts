@@ -496,7 +496,7 @@ class Collector:
                 discovered[addr] = {'firstSeen': first_seen, 'status': 'NO_CODE_AT_REFERENCE',
                                     'scope': 'External routing recipient; investigate ownership and economic purpose'}
                 continue
-            items = source_event_hints(ROOT / 'contracts/SlpPharosProxy.sol') + source_event_hints(ROOT / 'contracts/SlpPharosRewardsVault.sol')
+            items = []  # Unknown routing code has no authenticated business ABI.
             extra[addr] = dict(name='Historical routing contract ' + addr, address=addr, start=self.inv['start'],
                                abi=items, abiStatus='UNVERIFIED_SOURCE_HINT', known={})
             discovered[addr] = dict(firstSeen=first_seen, status='RAW_BACKFILL', runtimeKeccak=keccak256(bytes.fromhex(code[2:])))

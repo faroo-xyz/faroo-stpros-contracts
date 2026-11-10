@@ -91,15 +91,21 @@ def runtime_binding(record, cached):
 
 def authenticate(repo, store, logs):
     repo = safe(repo).resolve()
-    head = subprocess.check_output(['git', '-C', str(repo), 'rev-parse', 'HEAD'], text=True).strip()
+    from .slp_provider import LocalProvider
+    local = LocalProvider(repo) if (repo / 'deployments/PROVENANCE.json').exists() or repo.name == 'slp' else None
+    origin_bytes = local.origin_bytes if local else lambda revision, path: git_bytes(repo, revision, path)
+    head = local.provenance['originCommit'] if local else subprocess.check_output(['git', '-C', str(repo), 'rev-parse', 'HEAD'], text=True).strip()
     cached = store.get('cache/snapshots/external-implementations.json', {})
     external = store.get('cache/snapshots/external-state.json', {})
     headers = store.get('cache/snapshots/headers.json', {})
-    if external.get('snapshot', {}).get('hash') != SNAPSHOT['hash']:
+    if any(external.get('snapshot', {}).get(k) != v for k, v in SNAPSHOT.items()):
         raise EvidenceError('external snapshot binding missing')
     out = {'snapshot': SNAPSHOT, 'sourceRepository': str(repo), 'repositoryHead': head,
            'deploymentCommit': DEPLOYMENT_COMMIT, 'implementations': {}, 'proxies': {},
            'records': {}, 'status': 'PASS', 'limitations': []}
+    if local:
+        out.update(provider='local-origin-manifest', sourceRepository=local.provenance['originRepository'],
+                   artifactRoot=str(repo), repositoryHead=None, originCommit=head)
     folder = repo / 'deployments/pharos_pacific_mainnet'
     chain = safe(folder / '.chainId').read_text().strip()
     if int(chain) != 1672:
@@ -108,7 +114,7 @@ def authenticate(repo, store, logs):
     for name in ('SlpPharosProxy', 'SlpPharosProxy_1', 'SlpPharosRewardsVault'):
         rel = f'deployments/pharos_pacific_mainnet/{name}_Implementation.json'
         raw = safe(repo / rel).read_bytes()
-        if git_bytes(repo, DEPLOYMENT_COMMIT, rel) != raw:
+        if origin_bytes(DEPLOYMENT_COMMIT, rel) != raw:
             raise EvidenceError('deployment artifact differs from pinned historical commit')
         record = json.loads(raw); impl = record['address'].lower()
         if impl not in cached:
@@ -120,16 +126,16 @@ def authenticate(repo, store, logs):
             if not path.startswith('contracts/'):
                 continue
             content = source['content'].encode()
-            if git_bytes(repo, DEPLOYMENT_COMMIT, path) != content:
+            if origin_bytes(DEPLOYMENT_COMMIT, path) != content:
                 raise EvidenceError('compiler source differs from deployment-commit source')
             introduced = SOURCE_COMMITS.get(path)
-            if introduced and git_bytes(repo, introduced, path) != content:
+            if introduced and origin_bytes(introduced, path) != content:
                 raise EvidenceError('source-change commit is not the compiled source')
             project_sources[path] = {'sourceChangeCommit': introduced, 'keccak256': source['keccak256'],
                                      'headFileMatches': safe(repo / path).read_bytes() == content}
         input_rel = f'deployments/pharos_pacific_mainnet/solcInputs/{record["solcInputHash"]}.json'
         input_raw = safe(repo / input_rel).read_bytes()
-        if git_bytes(repo, DEPLOYMENT_COMMIT, input_rel) != input_raw:
+        if origin_bytes(DEPLOYMENT_COMMIT, input_rel) != input_raw:
             raise EvidenceError('compiler input differs from historical record')
         compiler_input = json.loads(input_raw)
         for key, default in [('optimizer', {}), ('evmVersion', None), ('libraries', {}), ('remappings', []), ('viaIR', False)]:
@@ -146,7 +152,7 @@ def authenticate(repo, store, logs):
         out['implementations'][impl] = binding
         proxy_rel = f'deployments/pharos_pacific_mainnet/{name}_Proxy.json'
         proxy_raw = safe(repo / proxy_rel).read_bytes(); proxy = json.loads(proxy_raw)
-        if git_bytes(repo, DEPLOYMENT_COMMIT, proxy_rel) != proxy_raw:
+        if origin_bytes(DEPLOYMENT_COMMIT, proxy_rel) != proxy_raw:
             raise EvidenceError('proxy record differs from deployment commit')
         address = proxy['address'].lower(); slot = external['proxySlots'][address]
         if slot['implementation'] != impl:
@@ -179,6 +185,7 @@ def authenticate(repo, store, logs):
         initialization = abi.decode_function(record['abi'], proxy['args'][2])
         out['proxies'][address] = {'name': name, 'implementation': impl, 'admin': slot['admin'],
             'runtimeKeccak': slot['runtimeKeccak'], 'abi': record['abi'] + PROXY_ABI,
+            'implementationAbi': record['abi'], 'proxyAbi': PROXY_ABI,
             'initialization': initialization, 'upgradeHistory': history, 'status': 'PASS',
             'proxyRecord': proxy_rel, 'proxyRecordSha256': digest(proxy_raw)}
         out['records'][rel] = digest(raw); out['records'][proxy_rel] = digest(proxy_raw); out['records'][input_rel] = digest(input_raw)

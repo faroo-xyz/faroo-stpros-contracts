@@ -10,6 +10,19 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'tools/ci'))
 import canonical as native
 
+# SHA256 of canonical JSON (sorted keys, compact separators), contracts map only.
+# Historical 0625e52027d797dbb46e17be1dcc0acca6b52288:
+# 23b97c06c771f86118292add069d3ccd8c317852034029ff32f9c813a26025c5
+# The active release was reviewed in ab46ed7a2a76750e24d2a54cb23b2757d6cb3a85.
+# Keep this anchor independent of the mutable lock; exports need no Git history.
+REVIEWED_CONTRACTS_SHA256 = '2b776393adc2f29caf98400a5bf15d6390df4cdb4e57246011dd89aa2cbe6c14'
+
+
+def require_reviewed_contracts(contracts):
+    encoded = json.dumps(contracts, sort_keys=True, separators=(',', ':')).encode()
+    if native.sha(encoded) != REVIEWED_CONTRACTS_SHA256:
+        raise ValueError('reviewed contracts reference drift')
+
 
 class NativeBuild(unittest.TestCase):
     @classmethod
@@ -24,9 +37,16 @@ class NativeBuild(unittest.TestCase):
         cls.output = native.snapshot_build.compile_input(cls.std, cls.solc)
         cls.artifact = native.artifact(cls.root, 'YieldVaultFactory', cls.std, cls.output)
 
-    def test_original_artifact_hashes_are_unchanged(self):
-        encoded = json.dumps(self.lock['contracts'], sort_keys=True, separators=(',', ':')).encode()
-        self.assertEqual(native.sha(encoded), '23b97c06c771f86118292add069d3ccd8c317852034029ff32f9c813a26025c5')
+    def test_reviewed_current_artifact_hashes_are_unchanged(self):
+        require_reviewed_contracts(self.lock['contracts'])
+
+    def test_modified_current_reference_is_rejected(self):
+        for name in self.lock['contracts']:
+            with self.subTest(contract=name):
+                changed = copy.deepcopy(self.lock['contracts'])
+                changed[name]['runtimeKeccak'] = '0x' + '00' * 32
+                with self.assertRaisesRegex(ValueError, 'reference drift'):
+                    require_reviewed_contracts(changed)
 
     def test_configuration_and_vendor_drift_refused_before_build(self):
         native.configuration(self.lock)

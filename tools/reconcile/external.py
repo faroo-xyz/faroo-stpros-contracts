@@ -110,7 +110,7 @@ def observe(collector, snap, logs):
         call(addr, 'getRewardsVault()')
     # Enumerate both roles even if they are absent from current documentation.
     for addr, target in inv['targets'].items():
-        if target['abiStatus'] not in ('UNVERIFIED_SOURCE_HINT', 'AUTHENTICATED_RECORDED_RUNTIME'):
+        if target['abiStatus'] not in ('UNVERIFIED_SOURCE_HINT', 'RECORDED_LOCAL_ORIGIN_MANIFEST', 'AUTHENTICATED_RECORDED_RUNTIME'):
             continue
         roles = {}
         for role in ('0x' + '00' * 32, keccak256(b'WHITELIST_ROLE')):
@@ -145,7 +145,7 @@ def observe_proxy_slots(collector, snap):
     slots = out.setdefault('proxySlots', {})
     admin_slot = hex(int(keccak256(b'eip1967.proxy.admin'), 16) - 1)
     for addr, target in collector.inv['targets'].items():
-        if target['abiStatus'] not in ('UNVERIFIED_SOURCE_HINT', 'AUTHENTICATED_RECORDED_RUNTIME', 'UNVERIFIED_IMPLEMENTATION') or addr in slots:
+        if target['abiStatus'] not in ('UNVERIFIED_SOURCE_HINT', 'RECORDED_LOCAL_ORIGIN_MANIFEST', 'AUTHENTICATED_RECORDED_RUNTIME', 'UNVERIFIED_IMPLEMENTATION') or addr in slots:
             continue
         row = {'interpretation': 'Raw EIP-1967 observations; proxy/source identity remains unverified'}
         for label, slot in [('implementation', IMPL_SLOT), ('admin', admin_slot)]:

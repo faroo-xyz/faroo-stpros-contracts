@@ -322,18 +322,29 @@ def decode_safe_batch(calldata):
 def stale_checker_finding(source_repo, external, attestation):
     """Report a concrete off-chain checker mismatch without changing the source repo."""
     root = safe(source_repo)
-    config_path = root/'constants/constants.ts'
-    text = safe(config_path).read_text().split('export const MULTISIG_ADDRESS', 1)[1]
-    match = re.search(r"\[CHAIN_ID\.PHAROS_PACIFIC_MAINNET\]:\s*'(0x[0-9a-fA-F]{40})'", text)
-    if not match:
-        return None
-    expected = match.group(1).lower(); observed = {}
-    references = [str(config_path)]
-    for name in ('SlpPharosProxy', 'SlpPharosRewardsVault'):
-        path = root/'tasks'/f'{name}.ts'
-        if 'expect(await' not in safe(path).read_text() or 'hasRole(DEFAULT_ADMIN_ROLE, MULTISIG_ADDRESS[chainId])' not in path.read_text():
+    if attestation.get('provider') == 'local-origin-manifest':
+        evidence_path = Path(__file__).with_name('historical-checker.json')
+        raw = safe(evidence_path).read_bytes()
+        if digest(raw) != '4022ccdf1635fffa2cdafe9a32daf4e46a35063e9465cf937f8f3ed549799170':
+            raise EvidenceError('historical checker evidence drift')
+        frozen = json.loads(raw)
+        match = re.search(r"'(0x[0-9a-fA-F]{40})'", frozen['files']['constants/constants.ts']['excerpt'])
+        expected = match.group(1).lower(); observed = {}
+        references = [str(evidence_path)]
+    else:
+        root = safe(source_repo)
+        config_path = root/'constants/constants.ts'
+        text = safe(config_path).read_text().split('export const MULTISIG_ADDRESS', 1)[1]
+        match = re.search(r"\[CHAIN_ID\.PHAROS_PACIFIC_MAINNET\]:\s*'(0x[0-9a-fA-F]{40})'", text)
+        if not match:
             return None
-        references.append(str(path))
+        expected = match.group(1).lower(); observed = {}
+        references = [str(config_path)]
+        for name in ('SlpPharosProxy', 'SlpPharosRewardsVault'):
+            path = root/'tasks'/f'{name}.ts'
+            if 'expect(await' not in safe(path).read_text() or 'hasRole(DEFAULT_ADMIN_ROLE, MULTISIG_ADDRESS[chainId])' not in path.read_text():
+                return None
+            references.append(str(path))
     for address in attestation['proxies']:
         members = external['roles'][address]['0x'+'00'*32]
         observed[address] = {'enumeratedAdmins':members,'checkerExpectedAdminPresent':expected in members}

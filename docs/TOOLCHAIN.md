@@ -7,7 +7,7 @@ isolation, and which baselines are protected.
 
 | Path | Purpose |
 | --- | --- |
-| `contracts/` | Protocol contracts, access control, migration guard and atomic release assertions. `SlpPharosProxy.sol` and `SlpPharosRewardsVault.sol` are SLP-layer sources outside the canonical build ([below](#sources-outside-the-canonical-build)) |
+| `contracts/` | Protocol contracts, access control, migration guard and atomic release assertions |
 | `lib/` | Exact vendored dependency import closure, identities and licenses (`lib/DEPENDENCIES.json`) |
 | `deployments/` | Append-only deployment records: mainnet V1 (top level), mainnet V4 (`mainnet/v4/`, current), testnet; index `registry.json` ([README](../deployments/README.md)) |
 | `snapshots/` | Reviewed historical ABI, storage, runtime, state and gas baselines |
@@ -31,8 +31,7 @@ complete reference harnesses are kept in the research repository.
 ## Build identity
 
 `make build` exports the current safe source tree and runs `tools/ci/canonical.py`
-through the empty-environment runner. At the current tree this is expected to stop on source inventory drift; see
-[Sources outside the canonical build](#sources-outside-the-canonical-build). Python's standard library, reviewed native
+through the empty-environment runner. Python's standard library, reviewed native
 solc and vendored Solidity sources are the only build dependencies.
 
 Solidity 0.8.28 (`7893614a`), Cancun, optimizer 200, non-IR, literal-content IPFS
@@ -54,33 +53,30 @@ The build writes per-contract input, output, artifact and build-info JSON plus a
 manifest under the export's `cache/native-r4/`. Stale local generated files are
 never inputs. No Node or package-manager installation is required.
 
-## Sources outside the canonical build
+## Independent SLP module
 
-`contracts/SlpPharosProxy.sol` and `contracts/SlpPharosRewardsVault.sol` (the SLP execution layer) were added to `main`
-after the V4 audit freeze. They are **not** part of the protected production root set (`productionRoots` in
-`tools/ci/r4-reference.json`) or of the `a110037` core audit package; they are not externally audited
-([audit scope](../README.md#audit-scope)). They import `../interfaces/pharos/*` and an OpenZeppelin
-extension that are not vendored, so they do not compile in this repository.
+The exact deployed SLP sources live under `slp/contracts/`. Its OZ 5.3.0
+production closure is separate from root OZ 5.6.1 and its test-only dependencies.
+The two stale root copies were removed by a verified Batch 1 deletion manifest.
+The frozen core inventory and all 13 artifact references remain unchanged.
 
-The V4 build source was fixed at commit `a110037`, and the V4 verification exports were built
-without these two files. Because `tools/ci/canonical.py` compares the `.sol` files under `contracts/` with
-`productionRoots`, a build of the unmodified current tree is expected to stop with `production source inventory drift`.
-**Two baselines, kept apart.**
+- `make slp-build`: reproduce both full SLP runtimes, metadata, ABI, selectors,
+  storage namespaces and three distinct proxy/implementation bindings.
+- `make slp-test`: validate the test closure and run the original 76 mock tests.
+- `make slp-verify`: build, test, native build/tamper regressions, reconciliation
+  regressions, export/toolchain tests and the 13-artifact core comparison.
 
-| | Protected production build | SLP-layer sources |
-|---|---|---|
-| Files | The 12 sources in `productionRoots` | `contracts/SlpPharosProxy.sol`, `contracts/SlpPharosRewardsVault.sol` |
-| Identity | 13 artifacts fixed by `tools/ci/r4-reference.json`; V4 built from `a110037` | None recorded; dependencies not vendored |
-| Status | Reproduced by the V4 verification exports, which did not contain the two SLP sources | Not compilable here; adapting them (vendoring or relocation) is pending |
+Each target creates an approved export and uses the existing clean-environment
+runner. No dependency downloads, RPC or historical checkout are needed. CI can
+invoke `make slp-verify`; no hosted CI workflow is present in this repository.
+The compiler binary is platform-pinned by the unchanged references; a different
+platform requires a separately reviewed compiler identity, not a hash refresh.
 
-Until the SLP sources are adapted, a protected build of the current tree needs an export without them, as the V4
-verification exports were made. No command in this repository removes them automatically. Never refresh
-`r4-reference.json` to make the drift pass.
-
-This documentation update did not run that build. It did observe a related effect in an isolated export of the current
-tree: `tools/snapshot/abi.py`, `storage.py` and `capabilities.py --check` stop with a missing vendored file
-(`lib/openzeppelin-contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol`, imported by `SlpPharosProxy.sol`).
-The result is the same at `HEAD`. How these sources are kept is a separate decision.
+The original `slp/foundry.toml` remains frozen. Test-only remappings are passed explicitly
+to Foundry and are separate from canonical release compilation. Passing these tests proves mock behavior and
+artifact correspondence, not mainnet E2E behavior or external audit approval.
+Fixed historical reconciliation retains its original block/hash and confidence
+limitations. Current routing/roles and the Batch 3 campaign require separate evidence.
 
 ## Commands
 
@@ -120,7 +116,7 @@ approval requirements.
 
 ```sh
 dest=$(tools/verify/export.sh /Volumes/project/tmp/faroo-export-$(date +%s) | tail -1)
-tools/verify/run.sh "$dest" python3 tools/ci/canonical.py   # see "Sources outside the canonical build"
+tools/verify/run.sh "$dest" python3 tools/ci/canonical.py
 tools/verify/run.sh "$dest" python3 -m unittest discover -s tests/toolchain -p 'test_*.py' -v
 tools/verify/run.sh "$dest" python3 tests/release/native/gate.py
 tools/verify/run.sh "$dest" python3 -m unittest discover -s tests/release/native -p 'test_*.py' -v
@@ -186,3 +182,17 @@ are retired together. No execution interface replaces them.
 
 Ignored user-owned research and protected storage are excluded from exports.
 Uncertain local material requires a documented provenance decision before cleanup.
+
+## Current SLP fork integration
+
+`slp/fork-tests/CurrentMainnet.t.sol` exercises existing mainnet proxies. It is opt-in and separate from the original
+76 mock tests. Run only in an approved export with explicit public RPC, authenticated block number and `SLP_FORK_BLOCK`.
+Use `FOUNDRY_TEST=fork-tests`, `--root slp --evm-version cancun` and the test-only forge-std remapping. The Cancun
+execution override supports deployed core transient storage; neither frozen compiler profile is changed.
+Cases labelled CONTROLLED use test cash, local time or local privileged setup; they never certify native credits.
+NativeBoundary diagnostics preserve unsupported native exits/credit boundaries. See the Batch 3 evidence archive
+for exact commands and exit codes. Production preparation has no SLP deployment or upgrade route.
+
+The native toolchain regression anchors the reviewed contracts map at commit
+`ab46ed7a2a76750e24d2a54cb23b2757d6cb3a85`; the earlier `0625e52` map remains historical provenance.
+The independent test pin rejects reference tampering, while canonical compilation checks all 13 artifacts.

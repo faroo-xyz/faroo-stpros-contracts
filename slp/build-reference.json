@@ -1,0 +1,829 @@
+{
+  "baseline": {
+    "historicalDeploymentCommit": "8943b4b2247354ccb5dc0c314649fe656517d3af",
+    "note": "Reviewed frozen SLP baseline, independent from core r4-reference; no automatic refresh.",
+    "phase1ManifestSha256": "ef718352153f1db1c5ce14f7080b88267cf754004f3bb0abbed262ecb7f62c74"
+  },
+  "compiler": "solc, the solidity compiler commandline interface\nVersion: 0.8.28+commit.7893614a.Darwin.appleclang\n",
+  "compilerSha256": "81515b0e53deaa266d549545ccaac0a5a96e6d4e8201c77f673b2c710976d9ea",
+  "contracts": {
+    "SlpPharosProxy": {
+      "implementationRecords": [
+        "deployments/pharos_pacific_mainnet/SlpPharosProxy_1_Implementation.json",
+        "deployments/pharos_pacific_mainnet/SlpPharosProxy_Implementation.json"
+      ],
+      "inputCanonicalSha256": "79731fa7e15b4281a3a5d8d4f984efc38cef6b891b476ef34c0bcfeb8650f099",
+      "inputRecord": "deployments/pharos_pacific_mainnet/solcInputs/4475c0eedef52cd212156bb08168ed9b.json",
+      "namespaces": [
+        {
+          "contract": "SlpPharosProxy",
+          "declaredConstants": [
+            "_STORAGE_LOCATION"
+          ],
+          "layout": {
+            "encoding": "inplace",
+            "label": "struct SlpPharosProxy.SlpPharosProxyStorage",
+            "members": [
+              {
+                "label": "_poolIds",
+                "offset": 0,
+                "slot": "0",
+                "type": {
+                  "encoding": "inplace",
+                  "label": "struct EnumerableSet.Bytes32Set",
+                  "members": [
+                    {
+                      "label": "_inner",
+                      "offset": 0,
+                      "slot": "0",
+                      "type": {
+                        "encoding": "inplace",
+                        "label": "struct EnumerableSet.Set",
+                        "members": [
+                          {
+                            "label": "_values",
+                            "offset": 0,
+                            "slot": "0",
+                            "type": {
+                              "base": {
+                                "encoding": "inplace",
+                                "label": "bytes32",
+                                "numberOfBytes": "32"
+                              },
+                              "encoding": "dynamic_array",
+                              "label": "bytes32[]",
+                              "numberOfBytes": "32"
+                            }
+                          },
+                          {
+                            "label": "_positions",
+                            "offset": 0,
+                            "slot": "1",
+                            "type": {
+                              "encoding": "mapping",
+                              "key": {
+                                "encoding": "inplace",
+                                "label": "bytes32",
+                                "numberOfBytes": "32"
+                              },
+                              "label": "mapping(bytes32 => uint256)",
+                              "numberOfBytes": "32",
+                              "value": {
+                                "encoding": "inplace",
+                                "label": "uint256",
+                                "numberOfBytes": "32"
+                              }
+                            }
+                          }
+                        ],
+                        "numberOfBytes": "64"
+                      }
+                    }
+                  ],
+                  "numberOfBytes": "64"
+                }
+              },
+              {
+                "label": "_bridgeVault",
+                "offset": 0,
+                "slot": "2",
+                "type": {
+                  "encoding": "inplace",
+                  "label": "address",
+                  "numberOfBytes": "20"
+                }
+              },
+              {
+                "label": "_rewardsVault",
+                "offset": 0,
+                "slot": "3",
+                "type": {
+                  "encoding": "inplace",
+                  "label": "address",
+                  "numberOfBytes": "20"
+                }
+              },
+              {
+                "label": "_totalBonded",
+                "offset": 0,
+                "slot": "4",
+                "type": {
+                  "encoding": "inplace",
+                  "label": "uint256",
+                  "numberOfBytes": "32"
+                }
+              },
+              {
+                "label": "_totalUnbonded",
+                "offset": 0,
+                "slot": "5",
+                "type": {
+                  "encoding": "inplace",
+                  "label": "uint256",
+                  "numberOfBytes": "32"
+                }
+              },
+              {
+                "label": "_totalRewardClaimed",
+                "offset": 0,
+                "slot": "6",
+                "type": {
+                  "encoding": "inplace",
+                  "label": "uint256",
+                  "numberOfBytes": "32"
+                }
+              },
+              {
+                "label": "_totalRewardTransferred",
+                "offset": 0,
+                "slot": "7",
+                "type": {
+                  "encoding": "inplace",
+                  "label": "uint256",
+                  "numberOfBytes": "32"
+                }
+              }
+            ],
+            "numberOfBytes": "256"
+          },
+          "namespace": "bifrost.storage.SlpPharosProxy",
+          "root": "0xa0268512d1ad72d0bd2136fed798eeda2422eb8b727c15d33589fbbf5c9a8d00",
+          "source": "contracts/pharos/SlpPharosProxy.sol",
+          "struct": "SlpPharosProxyStorage"
+        },
+        {
+          "contract": "AccessControlUpgradeable",
+          "declaredConstants": [
+            "AccessControlStorageLocation"
+          ],
+          "layout": {
+            "encoding": "inplace",
+            "label": "struct AccessControlUpgradeable.AccessControlStorage",
+            "members": [
+              {
+                "label": "_roles",
+                "offset": 0,
+                "slot": "0",
+                "type": {
+                  "encoding": "mapping",
+                  "key": {
+                    "encoding": "inplace",
+                    "label": "bytes32",
+                    "numberOfBytes": "32"
+                  },
+                  "label": "mapping(bytes32 => struct AccessControlUpgradeable.RoleData)",
+                  "numberOfBytes": "32",
+                  "value": {
+                    "encoding": "inplace",
+                    "label": "struct AccessControlUpgradeable.RoleData",
+                    "members": [
+                      {
+                        "label": "hasRole",
+                        "offset": 0,
+                        "slot": "0",
+                        "type": {
+                          "encoding": "mapping",
+                          "key": {
+                            "encoding": "inplace",
+                            "label": "address",
+                            "numberOfBytes": "20"
+                          },
+                          "label": "mapping(address => bool)",
+                          "numberOfBytes": "32",
+                          "value": {
+                            "encoding": "inplace",
+                            "label": "bool",
+                            "numberOfBytes": "1"
+                          }
+                        }
+                      },
+                      {
+                        "label": "adminRole",
+                        "offset": 0,
+                        "slot": "1",
+                        "type": {
+                          "encoding": "inplace",
+                          "label": "bytes32",
+                          "numberOfBytes": "32"
+                        }
+                      }
+                    ],
+                    "numberOfBytes": "64"
+                  }
+                }
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "namespace": "openzeppelin.storage.AccessControl",
+          "root": "0x02dd7bc7dec4dceedda775e58dd541e08a116c6c53815c0bd028192f7b626800",
+          "source": "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol",
+          "struct": "AccessControlStorage"
+        },
+        {
+          "contract": "AccessControlEnumerableUpgradeable",
+          "declaredConstants": [
+            "AccessControlEnumerableStorageLocation"
+          ],
+          "layout": {
+            "encoding": "inplace",
+            "label": "struct AccessControlEnumerableUpgradeable.AccessControlEnumerableStorage",
+            "members": [
+              {
+                "label": "_roleMembers",
+                "offset": 0,
+                "slot": "0",
+                "type": {
+                  "encoding": "mapping",
+                  "key": {
+                    "encoding": "inplace",
+                    "label": "bytes32",
+                    "numberOfBytes": "32"
+                  },
+                  "label": "mapping(bytes32 => struct EnumerableSet.AddressSet)",
+                  "numberOfBytes": "32",
+                  "value": {
+                    "encoding": "inplace",
+                    "label": "struct EnumerableSet.AddressSet",
+                    "members": [
+                      {
+                        "label": "_inner",
+                        "offset": 0,
+                        "slot": "0",
+                        "type": {
+                          "encoding": "inplace",
+                          "label": "struct EnumerableSet.Set",
+                          "members": [
+                            {
+                              "label": "_values",
+                              "offset": 0,
+                              "slot": "0",
+                              "type": {
+                                "base": {
+                                  "encoding": "inplace",
+                                  "label": "bytes32",
+                                  "numberOfBytes": "32"
+                                },
+                                "encoding": "dynamic_array",
+                                "label": "bytes32[]",
+                                "numberOfBytes": "32"
+                              }
+                            },
+                            {
+                              "label": "_positions",
+                              "offset": 0,
+                              "slot": "1",
+                              "type": {
+                                "encoding": "mapping",
+                                "key": {
+                                  "encoding": "inplace",
+                                  "label": "bytes32",
+                                  "numberOfBytes": "32"
+                                },
+                                "label": "mapping(bytes32 => uint256)",
+                                "numberOfBytes": "32",
+                                "value": {
+                                  "encoding": "inplace",
+                                  "label": "uint256",
+                                  "numberOfBytes": "32"
+                                }
+                              }
+                            }
+                          ],
+                          "numberOfBytes": "64"
+                        }
+                      }
+                    ],
+                    "numberOfBytes": "64"
+                  }
+                }
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "namespace": "openzeppelin.storage.AccessControlEnumerable",
+          "root": "0xc1f6fe24621ce81ec5827caf0253cadb74709b061630e6b55e82371705932000",
+          "source": "@openzeppelin/contracts-upgradeable/access/extensions/AccessControlEnumerableUpgradeable.sol",
+          "struct": "AccessControlEnumerableStorage"
+        },
+        {
+          "contract": "Initializable",
+          "declaredConstants": [
+            "INITIALIZABLE_STORAGE"
+          ],
+          "layout": {
+            "encoding": "inplace",
+            "label": "struct Initializable.InitializableStorage",
+            "members": [
+              {
+                "label": "_initialized",
+                "offset": 0,
+                "slot": "0",
+                "type": {
+                  "encoding": "inplace",
+                  "label": "uint64",
+                  "numberOfBytes": "8"
+                }
+              },
+              {
+                "label": "_initializing",
+                "offset": 8,
+                "slot": "0",
+                "type": {
+                  "encoding": "inplace",
+                  "label": "bool",
+                  "numberOfBytes": "1"
+                }
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "namespace": "openzeppelin.storage.Initializable",
+          "root": "0xf0c57e16840df040f15088dc2f81fe391c3923bec73e23a9662efc9c229c6a00",
+          "source": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol",
+          "struct": "InitializableStorage"
+        },
+        {
+          "contract": "ReentrancyGuardUpgradeable",
+          "declaredConstants": [
+            "ReentrancyGuardStorageLocation"
+          ],
+          "layout": {
+            "encoding": "inplace",
+            "label": "struct ReentrancyGuardUpgradeable.ReentrancyGuardStorage",
+            "members": [
+              {
+                "label": "_status",
+                "offset": 0,
+                "slot": "0",
+                "type": {
+                  "encoding": "inplace",
+                  "label": "uint256",
+                  "numberOfBytes": "32"
+                }
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "namespace": "openzeppelin.storage.ReentrancyGuard",
+          "root": "0x9b779b17422d0df92223018b32b4d1fa46e071723d6817e2486d003becc55f00",
+          "source": "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol",
+          "struct": "ReentrancyGuardStorage"
+        }
+      ],
+      "runtimeKeccak": "0x48686658ca6bf1f01e3f47ddadc34c1531b4104c2c5ed12ca785fcf235fc0aa3",
+      "selectors": {
+        "DEFAULT_ADMIN_ROLE()": "a217fddf",
+        "STAKING()": "97610f30",
+        "WHITELIST_ROLE()": "7a997ab7",
+        "batchBond(bytes32[],uint256[])": "af44956e",
+        "batchClaim(bytes32[])": "f5b8f3dc",
+        "batchClaimReward(bytes32[])": "784f707b",
+        "batchSettleReward(bytes32[])": "8ae22ac4",
+        "batchUnbond(bytes32[])": "0acace0a",
+        "bond(bytes32,uint256)": "51f93215",
+        "claim(bytes32)": "bd66528a",
+        "claimReward(bytes32)": "f5414023",
+        "compoundRewards(bytes32)": "62ed5f4e",
+        "getBridgeVault()": "fca2b359",
+        "getRewardsVault()": "e23ddec5",
+        "getRoleAdmin(bytes32)": "248a9ca3",
+        "getRoleMember(bytes32,uint256)": "9010d07c",
+        "getRoleMemberCount(bytes32)": "ca15c873",
+        "getRoleMembers(bytes32)": "a3246ad3",
+        "grantRole(bytes32,address)": "2f2ff15d",
+        "hasRole(bytes32,address)": "91d14854",
+        "initialize(address,address[],address,address)": "42853aac",
+        "isPoolIdRegistered(bytes32)": "44ddc961",
+        "registerPoolId(bytes32)": "63410dca",
+        "registeredPools()": "063eb469",
+        "renounceRole(bytes32,address)": "36568abe",
+        "revokeRole(bytes32,address)": "d547741f",
+        "setBridgeVault(address)": "ebcb0b7a",
+        "settleReward(bytes32)": "73512734",
+        "supportsInterface(bytes4)": "01ffc9a7",
+        "totalBonded()": "44d96e95",
+        "totalRewardClaimed()": "6f83f6a2",
+        "totalRewardTransferred()": "c296527a",
+        "totalUnbonded()": "7578b296",
+        "transferBack(uint256)": "eae7236f",
+        "transferToRewardsVault(uint256)": "30bc5d2c",
+        "unbond(bytes32)": "2fd1c2cd",
+        "unregisterPoolId(bytes32)": "677b7fa3"
+      },
+      "settings": {
+        "evmVersion": "paris",
+        "metadata": {
+          "useLiteralContent": true
+        },
+        "optimizer": {
+          "enabled": true,
+          "runs": 200
+        },
+        "outputSelection": {
+          "*": {
+            "": [
+              "ast"
+            ],
+            "*": [
+              "abi",
+              "evm.bytecode",
+              "evm.deployedBytecode",
+              "evm.methodIdentifiers",
+              "metadata",
+              "devdoc",
+              "userdoc",
+              "storageLayout",
+              "evm.gasEstimates"
+            ]
+          }
+        }
+      },
+      "source": "contracts/pharos/SlpPharosProxy.sol",
+      "sourceNames": [
+        "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol",
+        "@openzeppelin/contracts-upgradeable/access/extensions/AccessControlEnumerableUpgradeable.sol",
+        "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol",
+        "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol",
+        "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol",
+        "@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol",
+        "@openzeppelin/contracts/access/IAccessControl.sol",
+        "@openzeppelin/contracts/access/extensions/IAccessControlEnumerable.sol",
+        "@openzeppelin/contracts/utils/Address.sol",
+        "@openzeppelin/contracts/utils/Arrays.sol",
+        "@openzeppelin/contracts/utils/Comparators.sol",
+        "@openzeppelin/contracts/utils/Errors.sol",
+        "@openzeppelin/contracts/utils/Panic.sol",
+        "@openzeppelin/contracts/utils/SlotDerivation.sol",
+        "@openzeppelin/contracts/utils/StorageSlot.sol",
+        "@openzeppelin/contracts/utils/introspection/IERC165.sol",
+        "@openzeppelin/contracts/utils/math/Math.sol",
+        "@openzeppelin/contracts/utils/math/SafeCast.sol",
+        "@openzeppelin/contracts/utils/structs/EnumerableSet.sol",
+        "contracts/interfaces/pharos/IStaking.sol",
+        "contracts/pharos/SlpPharosProxy.sol"
+      ],
+      "storageLayout": {
+        "storage": [],
+        "types": null
+      },
+      "targetOutputSha256": "09ff29c36addc7284ed8aab8c983f286760cd165a6f448d15ef6601f96768384"
+    },
+    "SlpPharosRewardsVault": {
+      "implementationRecords": [
+        "deployments/pharos_pacific_mainnet/SlpPharosRewardsVault_Implementation.json"
+      ],
+      "inputCanonicalSha256": "6f846c44ee4c3cee2a87231f848d75f5a2fb0b897819304af1c62d701363cb3e",
+      "inputRecord": "deployments/pharos_pacific_mainnet/solcInputs/2ac2454935e265547fc7a8f51f3bafcf.json",
+      "namespaces": [
+        {
+          "contract": "SlpPharosRewardsVault",
+          "declaredConstants": [
+            "_STORAGE_LOCATION"
+          ],
+          "layout": {
+            "encoding": "inplace",
+            "label": "struct SlpPharosRewardsVault.SlpPharosRewardsVaultStorage",
+            "members": [
+              {
+                "label": "_WPROS",
+                "offset": 0,
+                "slot": "0",
+                "type": {
+                  "encoding": "inplace",
+                  "label": "address",
+                  "numberOfBytes": "20"
+                }
+              },
+              {
+                "label": "_vTokenOracle",
+                "offset": 0,
+                "slot": "1",
+                "type": {
+                  "encoding": "inplace",
+                  "label": "address",
+                  "numberOfBytes": "20"
+                }
+              },
+              {
+                "label": "_slpPharosProxy",
+                "offset": 0,
+                "slot": "2",
+                "type": {
+                  "encoding": "inplace",
+                  "label": "address",
+                  "numberOfBytes": "20"
+                }
+              }
+            ],
+            "numberOfBytes": "96"
+          },
+          "namespace": "bifrost.storage.SlpPharosRewardsVault",
+          "root": "0xc9caa5aa7f245639b6131404c98b95a2e02b9e6b8426ecc4b7343ca4bf5dd200",
+          "source": "contracts/pharos/SlpPharosRewardsVault.sol",
+          "struct": "SlpPharosRewardsVaultStorage"
+        },
+        {
+          "contract": "AccessControlUpgradeable",
+          "declaredConstants": [
+            "AccessControlStorageLocation"
+          ],
+          "layout": {
+            "encoding": "inplace",
+            "label": "struct AccessControlUpgradeable.AccessControlStorage",
+            "members": [
+              {
+                "label": "_roles",
+                "offset": 0,
+                "slot": "0",
+                "type": {
+                  "encoding": "mapping",
+                  "key": {
+                    "encoding": "inplace",
+                    "label": "bytes32",
+                    "numberOfBytes": "32"
+                  },
+                  "label": "mapping(bytes32 => struct AccessControlUpgradeable.RoleData)",
+                  "numberOfBytes": "32",
+                  "value": {
+                    "encoding": "inplace",
+                    "label": "struct AccessControlUpgradeable.RoleData",
+                    "members": [
+                      {
+                        "label": "hasRole",
+                        "offset": 0,
+                        "slot": "0",
+                        "type": {
+                          "encoding": "mapping",
+                          "key": {
+                            "encoding": "inplace",
+                            "label": "address",
+                            "numberOfBytes": "20"
+                          },
+                          "label": "mapping(address => bool)",
+                          "numberOfBytes": "32",
+                          "value": {
+                            "encoding": "inplace",
+                            "label": "bool",
+                            "numberOfBytes": "1"
+                          }
+                        }
+                      },
+                      {
+                        "label": "adminRole",
+                        "offset": 0,
+                        "slot": "1",
+                        "type": {
+                          "encoding": "inplace",
+                          "label": "bytes32",
+                          "numberOfBytes": "32"
+                        }
+                      }
+                    ],
+                    "numberOfBytes": "64"
+                  }
+                }
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "namespace": "openzeppelin.storage.AccessControl",
+          "root": "0x02dd7bc7dec4dceedda775e58dd541e08a116c6c53815c0bd028192f7b626800",
+          "source": "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol",
+          "struct": "AccessControlStorage"
+        },
+        {
+          "contract": "AccessControlEnumerableUpgradeable",
+          "declaredConstants": [
+            "AccessControlEnumerableStorageLocation"
+          ],
+          "layout": {
+            "encoding": "inplace",
+            "label": "struct AccessControlEnumerableUpgradeable.AccessControlEnumerableStorage",
+            "members": [
+              {
+                "label": "_roleMembers",
+                "offset": 0,
+                "slot": "0",
+                "type": {
+                  "encoding": "mapping",
+                  "key": {
+                    "encoding": "inplace",
+                    "label": "bytes32",
+                    "numberOfBytes": "32"
+                  },
+                  "label": "mapping(bytes32 => struct EnumerableSet.AddressSet)",
+                  "numberOfBytes": "32",
+                  "value": {
+                    "encoding": "inplace",
+                    "label": "struct EnumerableSet.AddressSet",
+                    "members": [
+                      {
+                        "label": "_inner",
+                        "offset": 0,
+                        "slot": "0",
+                        "type": {
+                          "encoding": "inplace",
+                          "label": "struct EnumerableSet.Set",
+                          "members": [
+                            {
+                              "label": "_values",
+                              "offset": 0,
+                              "slot": "0",
+                              "type": {
+                                "base": {
+                                  "encoding": "inplace",
+                                  "label": "bytes32",
+                                  "numberOfBytes": "32"
+                                },
+                                "encoding": "dynamic_array",
+                                "label": "bytes32[]",
+                                "numberOfBytes": "32"
+                              }
+                            },
+                            {
+                              "label": "_positions",
+                              "offset": 0,
+                              "slot": "1",
+                              "type": {
+                                "encoding": "mapping",
+                                "key": {
+                                  "encoding": "inplace",
+                                  "label": "bytes32",
+                                  "numberOfBytes": "32"
+                                },
+                                "label": "mapping(bytes32 => uint256)",
+                                "numberOfBytes": "32",
+                                "value": {
+                                  "encoding": "inplace",
+                                  "label": "uint256",
+                                  "numberOfBytes": "32"
+                                }
+                              }
+                            }
+                          ],
+                          "numberOfBytes": "64"
+                        }
+                      }
+                    ],
+                    "numberOfBytes": "64"
+                  }
+                }
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "namespace": "openzeppelin.storage.AccessControlEnumerable",
+          "root": "0xc1f6fe24621ce81ec5827caf0253cadb74709b061630e6b55e82371705932000",
+          "source": "@openzeppelin/contracts-upgradeable/access/extensions/AccessControlEnumerableUpgradeable.sol",
+          "struct": "AccessControlEnumerableStorage"
+        },
+        {
+          "contract": "Initializable",
+          "declaredConstants": [
+            "INITIALIZABLE_STORAGE"
+          ],
+          "layout": {
+            "encoding": "inplace",
+            "label": "struct Initializable.InitializableStorage",
+            "members": [
+              {
+                "label": "_initialized",
+                "offset": 0,
+                "slot": "0",
+                "type": {
+                  "encoding": "inplace",
+                  "label": "uint64",
+                  "numberOfBytes": "8"
+                }
+              },
+              {
+                "label": "_initializing",
+                "offset": 8,
+                "slot": "0",
+                "type": {
+                  "encoding": "inplace",
+                  "label": "bool",
+                  "numberOfBytes": "1"
+                }
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "namespace": "openzeppelin.storage.Initializable",
+          "root": "0xf0c57e16840df040f15088dc2f81fe391c3923bec73e23a9662efc9c229c6a00",
+          "source": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol",
+          "struct": "InitializableStorage"
+        },
+        {
+          "contract": "ReentrancyGuardUpgradeable",
+          "declaredConstants": [
+            "ReentrancyGuardStorageLocation"
+          ],
+          "layout": {
+            "encoding": "inplace",
+            "label": "struct ReentrancyGuardUpgradeable.ReentrancyGuardStorage",
+            "members": [
+              {
+                "label": "_status",
+                "offset": 0,
+                "slot": "0",
+                "type": {
+                  "encoding": "inplace",
+                  "label": "uint256",
+                  "numberOfBytes": "32"
+                }
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "namespace": "openzeppelin.storage.ReentrancyGuard",
+          "root": "0x9b779b17422d0df92223018b32b4d1fa46e071723d6817e2486d003becc55f00",
+          "source": "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol",
+          "struct": "ReentrancyGuardStorage"
+        }
+      ],
+      "runtimeKeccak": "0x08c89ff66bb36f6ca361f89c06a45cbd79b480e5c5201b3cc93a4833318c50eb",
+      "selectors": {
+        "DEFAULT_ADMIN_ROLE()": "a217fddf",
+        "WHITELIST_ROLE()": "7a997ab7",
+        "getRoleAdmin(bytes32)": "248a9ca3",
+        "getRoleMember(bytes32,uint256)": "9010d07c",
+        "getRoleMemberCount(bytes32)": "ca15c873",
+        "getRoleMembers(bytes32)": "a3246ad3",
+        "getSlpPharosProxy()": "cfd0e94c",
+        "getVTokenOracle()": "d9f3c355",
+        "getWPROS()": "6b701676",
+        "grantRole(bytes32,address)": "2f2ff15d",
+        "hasRole(bytes32,address)": "91d14854",
+        "initialize(address,address[],address,address)": "42853aac",
+        "notifyOracle()": "3fba8b37",
+        "renounceRole(bytes32,address)": "36568abe",
+        "revokeRole(bytes32,address)": "d547741f",
+        "setSlpPharosProxy(address)": "75964c63",
+        "supportsInterface(bytes4)": "01ffc9a7"
+      },
+      "settings": {
+        "evmVersion": "paris",
+        "metadata": {
+          "useLiteralContent": true
+        },
+        "optimizer": {
+          "enabled": true,
+          "runs": 200
+        },
+        "outputSelection": {
+          "*": {
+            "": [
+              "ast"
+            ],
+            "*": [
+              "abi",
+              "evm.bytecode",
+              "evm.deployedBytecode",
+              "evm.methodIdentifiers",
+              "metadata",
+              "devdoc",
+              "userdoc",
+              "storageLayout",
+              "evm.gasEstimates"
+            ]
+          }
+        }
+      },
+      "source": "contracts/pharos/SlpPharosRewardsVault.sol",
+      "sourceNames": [
+        "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol",
+        "@openzeppelin/contracts-upgradeable/access/extensions/AccessControlEnumerableUpgradeable.sol",
+        "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol",
+        "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol",
+        "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol",
+        "@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol",
+        "@openzeppelin/contracts/access/IAccessControl.sol",
+        "@openzeppelin/contracts/access/extensions/IAccessControlEnumerable.sol",
+        "@openzeppelin/contracts/utils/Address.sol",
+        "@openzeppelin/contracts/utils/Arrays.sol",
+        "@openzeppelin/contracts/utils/Comparators.sol",
+        "@openzeppelin/contracts/utils/Errors.sol",
+        "@openzeppelin/contracts/utils/Panic.sol",
+        "@openzeppelin/contracts/utils/SlotDerivation.sol",
+        "@openzeppelin/contracts/utils/StorageSlot.sol",
+        "@openzeppelin/contracts/utils/introspection/IERC165.sol",
+        "@openzeppelin/contracts/utils/math/Math.sol",
+        "@openzeppelin/contracts/utils/math/SafeCast.sol",
+        "@openzeppelin/contracts/utils/structs/EnumerableSet.sol",
+        "contracts/interfaces/pharos/IOracle.sol",
+        "contracts/pharos/SlpPharosRewardsVault.sol"
+      ],
+      "storageLayout": {
+        "storage": [],
+        "types": null
+      },
+      "targetOutputSha256": "3573b48118bd3bcf92ffaddf64eca030acac6339433f99a55fc8cb4fca625da0"
+    }
+  },
+  "dependenciesSha256": "59a94389fa2a538c2e96c9a4511130bd26e0877e6f5d905d635cd170359e2df7",
+  "provenanceSha256": "cb3e045bb556a61473c6ef3d4ad9fb0a0dd0b953e458ac3b8b7329df909ea9bf",
+  "schema": "faroo-slp-build-v1",
+  "testConfigSha256": "3300a8df17bc18dc6eb9a13a61fd7cfe667979324f28278fcec2119c4367e79a"
+}

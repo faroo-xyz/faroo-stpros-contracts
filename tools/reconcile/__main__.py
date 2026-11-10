@@ -373,7 +373,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('command', choices=('plan', 'sync', 'reconcile', 'all', 'status', 'closeout'))
     parser.add_argument('--data-dir', default=DEFAULT_ROOT)
-    parser.add_argument('--slp-repo', default='/Volumes/project/workspace/vETH-3.0-contract', help='Read-only source artifact input for fixed-snapshot closeout')
+    parser.add_argument('--slp-repo', default=str(ROOT / 'slp'), help='Local slp module by default; explicit legacy origin checkout supported for fixed-snapshot archival closeout')
     parser.add_argument('--budget-cu', type=int, default=5_000_000)
     parser.add_argument('--run-budget-cu', type=int, default=100_000)
     parser.add_argument('--chunk', type=int, default=5000)

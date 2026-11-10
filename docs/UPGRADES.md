@@ -56,7 +56,7 @@ version. Extending the builder for a new release is a reviewed tooling change of
 | StPROS, Oracle, BridgeVault, SlpDistributor, YieldVaultFactory | OpenZeppelin v4 `TransparentUpgradeableProxy`; `ProxyAdmin.upgrade` / `upgradeAndCall` on the shared ProxyAdmin `0x4238ea4adfa2bd6a5fc9b5e245dc1900cf0258aa` | Timelock (owner of the ProxyAdmin) |
 | YieldVault implementation | `UpgradeableBeacon` owned by the Factory; `YieldVaultFactory.upgradeBeaconTo` | Timelock (owner of the Factory) |
 | TimelockController | Not upgradeable. Roles and delay change only through its own operations | Timelock |
-| SLP execution contracts and RewardsVault | Their own ProxyAdmin `0x480eb384681777bf21e72b8c8538987c2801b4b7` | SLP administrator, **outside the Timelock** |
+| SLP execution contracts and RewardsVault | Separate ProxyAdmin `0x480eb384681777bf21e72b8c8538987c2801b4b7` | Timelock owner since block 21585015; verified again at block 22640026. Separate `slp/` build; no core migration route |
 
 Rules for core upgrades:
 - Use the **recorded OZ v4** ProxyAdmin runtime reference, not the vendored OZ v5 ProxyAdmin. A new core proxy uses

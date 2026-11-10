@@ -1,0 +1,287 @@
+{
+  "packages": {
+    "contracts": {
+      "commit": "e4f70216d759d8e6a64144a9e1f7bbeed78e7079",
+      "license": "MIT; notices preserved in each exact source",
+      "repository": "https://github.com/OpenZeppelin/openzeppelin-contracts",
+      "version": "5.3.0"
+    },
+    "contracts-upgradeable": {
+      "commit": "60b305a8f3ff0c7688f02ac470417b6bbf1c4d27",
+      "license": "MIT; notices preserved in each exact source",
+      "repository": "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable",
+      "version": "5.3.0"
+    }
+  },
+  "schema": "faroo-slp-dependencies-v1",
+  "sources": {
+    "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol": {
+      "origin": {
+        "commit": "60b305a8f3ff0c7688f02ac470417b6bbf1c4d27",
+        "license": "MIT; notices preserved in each exact source",
+        "literalInputOrigin": "deployments/pharos_pacific_mainnet/solcInputs/4475c0eedef52cd212156bb08168ed9b.json",
+        "path": "contracts/access/AccessControlUpgradeable.sol",
+        "repository": "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable",
+        "version": "5.3.0"
+      },
+      "path": "lib/openzeppelin-contracts-upgradeable/access/AccessControlUpgradeable.sol",
+      "sha256": "f50748ad56bbe7f2d6ced717731ee684118a7e1a0dfd6458bc2efce0d28b0980"
+    },
+    "@openzeppelin/contracts-upgradeable/access/extensions/AccessControlEnumerableUpgradeable.sol": {
+      "origin": {
+        "commit": "60b305a8f3ff0c7688f02ac470417b6bbf1c4d27",
+        "license": "MIT; notices preserved in each exact source",
+        "literalInputOrigin": "deployments/pharos_pacific_mainnet/solcInputs/4475c0eedef52cd212156bb08168ed9b.json",
+        "path": "contracts/access/extensions/AccessControlEnumerableUpgradeable.sol",
+        "repository": "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable",
+        "version": "5.3.0"
+      },
+      "path": "lib/openzeppelin-contracts-upgradeable/access/extensions/AccessControlEnumerableUpgradeable.sol",
+      "sha256": "071bc543877c67cb0e50d0a067af352df2e9edc09e9d3660f18f838a34e95b35"
+    },
+    "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol": {
+      "origin": {
+        "commit": "60b305a8f3ff0c7688f02ac470417b6bbf1c4d27",
+        "license": "MIT; notices preserved in each exact source",
+        "literalInputOrigin": "deployments/pharos_pacific_mainnet/solcInputs/4475c0eedef52cd212156bb08168ed9b.json",
+        "path": "contracts/proxy/utils/Initializable.sol",
+        "repository": "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable",
+        "version": "5.3.0"
+      },
+      "path": "lib/openzeppelin-contracts-upgradeable/proxy/utils/Initializable.sol",
+      "sha256": "f527a063813c2bf60c153fb08e38539578935402894fcc36fac42324ca325d3b"
+    },
+    "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol": {
+      "origin": {
+        "commit": "60b305a8f3ff0c7688f02ac470417b6bbf1c4d27",
+        "license": "MIT; notices preserved in each exact source",
+        "literalInputOrigin": "deployments/pharos_pacific_mainnet/solcInputs/4475c0eedef52cd212156bb08168ed9b.json",
+        "path": "contracts/utils/ContextUpgradeable.sol",
+        "repository": "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable",
+        "version": "5.3.0"
+      },
+      "path": "lib/openzeppelin-contracts-upgradeable/utils/ContextUpgradeable.sol",
+      "sha256": "a08e16324da33a9d666dc07a22ae58031c242a3869f6808e55b4b82fc70cb209"
+    },
+    "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol": {
+      "origin": {
+        "commit": "60b305a8f3ff0c7688f02ac470417b6bbf1c4d27",
+        "license": "MIT; notices preserved in each exact source",
+        "literalInputOrigin": "deployments/pharos_pacific_mainnet/solcInputs/4475c0eedef52cd212156bb08168ed9b.json",
+        "path": "contracts/utils/ReentrancyGuardUpgradeable.sol",
+        "repository": "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable",
+        "version": "5.3.0"
+      },
+      "path": "lib/openzeppelin-contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol",
+      "sha256": "11b45418823fd6e961d8db5cf5c2795b08f51f88a66f8e37a38fcd052ee711a4"
+    },
+    "@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol": {
+      "origin": {
+        "commit": "60b305a8f3ff0c7688f02ac470417b6bbf1c4d27",
+        "license": "MIT; notices preserved in each exact source",
+        "literalInputOrigin": "deployments/pharos_pacific_mainnet/solcInputs/4475c0eedef52cd212156bb08168ed9b.json",
+        "path": "contracts/utils/introspection/ERC165Upgradeable.sol",
+        "repository": "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable",
+        "version": "5.3.0"
+      },
+      "path": "lib/openzeppelin-contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol",
+      "sha256": "586f77f25f65f2b957d5579c346d39cc883848962a375857c151c5bb15c0eb93"
+    },
+    "@openzeppelin/contracts/access/IAccessControl.sol": {
+      "origin": {
+        "commit": "e4f70216d759d8e6a64144a9e1f7bbeed78e7079",
+        "license": "MIT; notices preserved in each exact source",
+        "literalInputOrigin": "deployments/pharos_pacific_mainnet/solcInputs/4475c0eedef52cd212156bb08168ed9b.json",
+        "path": "contracts/access/IAccessControl.sol",
+        "repository": "https://github.com/OpenZeppelin/openzeppelin-contracts",
+        "version": "5.3.0"
+      },
+      "path": "lib/openzeppelin-contracts/access/IAccessControl.sol",
+      "sha256": "e3c0885d437bb495ca88d12a04cadaa89db7288f4f0400f728a7634025a24536"
+    },
+    "@openzeppelin/contracts/access/extensions/IAccessControlEnumerable.sol": {
+      "origin": {
+        "commit": "e4f70216d759d8e6a64144a9e1f7bbeed78e7079",
+        "license": "MIT; notices preserved in each exact source",
+        "literalInputOrigin": "deployments/pharos_pacific_mainnet/solcInputs/4475c0eedef52cd212156bb08168ed9b.json",
+        "path": "contracts/access/extensions/IAccessControlEnumerable.sol",
+        "repository": "https://github.com/OpenZeppelin/openzeppelin-contracts",
+        "version": "5.3.0"
+      },
+      "path": "lib/openzeppelin-contracts/access/extensions/IAccessControlEnumerable.sol",
+      "sha256": "f91dc4b5750c1bac7a6a11a6057f14f01121847e6a6284e1200d8a87a4c4ff1e"
+    },
+    "@openzeppelin/contracts/utils/Address.sol": {
+      "origin": {
+        "commit": "e4f70216d759d8e6a64144a9e1f7bbeed78e7079",
+        "license": "MIT; notices preserved in each exact source",
+        "literalInputOrigin": "deployments/pharos_pacific_mainnet/solcInputs/4475c0eedef52cd212156bb08168ed9b.json",
+        "path": "contracts/utils/Address.sol",
+        "repository": "https://github.com/OpenZeppelin/openzeppelin-contracts",
+        "version": "5.3.0"
+      },
+      "path": "lib/openzeppelin-contracts/utils/Address.sol",
+      "sha256": "2395099726e6c215641a5857a74f663987f37a3ad8a2932a9f3d8ee27fb11dd4"
+    },
+    "@openzeppelin/contracts/utils/Arrays.sol": {
+      "origin": {
+        "commit": "e4f70216d759d8e6a64144a9e1f7bbeed78e7079",
+        "license": "MIT; notices preserved in each exact source",
+        "literalInputOrigin": "deployments/pharos_pacific_mainnet/solcInputs/4475c0eedef52cd212156bb08168ed9b.json",
+        "path": "contracts/utils/Arrays.sol",
+        "repository": "https://github.com/OpenZeppelin/openzeppelin-contracts",
+        "version": "5.3.0"
+      },
+      "path": "lib/openzeppelin-contracts/utils/Arrays.sol",
+      "sha256": "bc070d5b633ee27268e10ff8e5677f64010bc3955980db2a6e9e855780051ef7"
+    },
+    "@openzeppelin/contracts/utils/Comparators.sol": {
+      "origin": {
+        "commit": "e4f70216d759d8e6a64144a9e1f7bbeed78e7079",
+        "license": "MIT; notices preserved in each exact source",
+        "literalInputOrigin": "deployments/pharos_pacific_mainnet/solcInputs/4475c0eedef52cd212156bb08168ed9b.json",
+        "path": "contracts/utils/Comparators.sol",
+        "repository": "https://github.com/OpenZeppelin/openzeppelin-contracts",
+        "version": "5.3.0"
+      },
+      "path": "lib/openzeppelin-contracts/utils/Comparators.sol",
+      "sha256": "52fb1c8f57967d42a3214bde4a8a414ab25c2e3a844d00e171ca56487024e009"
+    },
+    "@openzeppelin/contracts/utils/Errors.sol": {
+      "origin": {
+        "commit": "e4f70216d759d8e6a64144a9e1f7bbeed78e7079",
+        "license": "MIT; notices preserved in each exact source",
+        "literalInputOrigin": "deployments/pharos_pacific_mainnet/solcInputs/4475c0eedef52cd212156bb08168ed9b.json",
+        "path": "contracts/utils/Errors.sol",
+        "repository": "https://github.com/OpenZeppelin/openzeppelin-contracts",
+        "version": "5.3.0"
+      },
+      "path": "lib/openzeppelin-contracts/utils/Errors.sol",
+      "sha256": "0704b9d6c032cca8512a3bc3f30f49f86f1f03102d2896a3d23e794b82efea66"
+    },
+    "@openzeppelin/contracts/utils/Panic.sol": {
+      "origin": {
+        "commit": "e4f70216d759d8e6a64144a9e1f7bbeed78e7079",
+        "license": "MIT; notices preserved in each exact source",
+        "literalInputOrigin": "deployments/pharos_pacific_mainnet/solcInputs/4475c0eedef52cd212156bb08168ed9b.json",
+        "path": "contracts/utils/Panic.sol",
+        "repository": "https://github.com/OpenZeppelin/openzeppelin-contracts",
+        "version": "5.3.0"
+      },
+      "path": "lib/openzeppelin-contracts/utils/Panic.sol",
+      "sha256": "270fc8401c1a13fae6a7a4a2dd6e381b95d658896701e51f0d3e2688acab3dec"
+    },
+    "@openzeppelin/contracts/utils/SlotDerivation.sol": {
+      "origin": {
+        "commit": "e4f70216d759d8e6a64144a9e1f7bbeed78e7079",
+        "license": "MIT; notices preserved in each exact source",
+        "literalInputOrigin": "deployments/pharos_pacific_mainnet/solcInputs/4475c0eedef52cd212156bb08168ed9b.json",
+        "path": "contracts/utils/SlotDerivation.sol",
+        "repository": "https://github.com/OpenZeppelin/openzeppelin-contracts",
+        "version": "5.3.0"
+      },
+      "path": "lib/openzeppelin-contracts/utils/SlotDerivation.sol",
+      "sha256": "daddbbeb265c87b7172548d58baede96b167cd89c6c7884ff2705676fab69438"
+    },
+    "@openzeppelin/contracts/utils/StorageSlot.sol": {
+      "origin": {
+        "commit": "e4f70216d759d8e6a64144a9e1f7bbeed78e7079",
+        "license": "MIT; notices preserved in each exact source",
+        "literalInputOrigin": "deployments/pharos_pacific_mainnet/solcInputs/4475c0eedef52cd212156bb08168ed9b.json",
+        "path": "contracts/utils/StorageSlot.sol",
+        "repository": "https://github.com/OpenZeppelin/openzeppelin-contracts",
+        "version": "5.3.0"
+      },
+      "path": "lib/openzeppelin-contracts/utils/StorageSlot.sol",
+      "sha256": "75704538dcb223239280c6726d9a31cf769a7816718517c997fc7d63bdb70778"
+    },
+    "@openzeppelin/contracts/utils/introspection/IERC165.sol": {
+      "origin": {
+        "commit": "e4f70216d759d8e6a64144a9e1f7bbeed78e7079",
+        "license": "MIT; notices preserved in each exact source",
+        "literalInputOrigin": "deployments/pharos_pacific_mainnet/solcInputs/4475c0eedef52cd212156bb08168ed9b.json",
+        "path": "contracts/utils/introspection/IERC165.sol",
+        "repository": "https://github.com/OpenZeppelin/openzeppelin-contracts",
+        "version": "5.3.0"
+      },
+      "path": "lib/openzeppelin-contracts/utils/introspection/IERC165.sol",
+      "sha256": "7c5c3f98ab876991e7dd34b84d41137e836306eb9f36f6386a631f5be3f5d6d4"
+    },
+    "@openzeppelin/contracts/utils/math/Math.sol": {
+      "origin": {
+        "commit": "e4f70216d759d8e6a64144a9e1f7bbeed78e7079",
+        "license": "MIT; notices preserved in each exact source",
+        "literalInputOrigin": "deployments/pharos_pacific_mainnet/solcInputs/4475c0eedef52cd212156bb08168ed9b.json",
+        "path": "contracts/utils/math/Math.sol",
+        "repository": "https://github.com/OpenZeppelin/openzeppelin-contracts",
+        "version": "5.3.0"
+      },
+      "path": "lib/openzeppelin-contracts/utils/math/Math.sol",
+      "sha256": "92fee281fd46a1b058b190cf21d6b1a528f0433a907850ae1c9bcf36c5c0cd98"
+    },
+    "@openzeppelin/contracts/utils/math/SafeCast.sol": {
+      "origin": {
+        "commit": "e4f70216d759d8e6a64144a9e1f7bbeed78e7079",
+        "license": "MIT; notices preserved in each exact source",
+        "literalInputOrigin": "deployments/pharos_pacific_mainnet/solcInputs/4475c0eedef52cd212156bb08168ed9b.json",
+        "path": "contracts/utils/math/SafeCast.sol",
+        "repository": "https://github.com/OpenZeppelin/openzeppelin-contracts",
+        "version": "5.3.0"
+      },
+      "path": "lib/openzeppelin-contracts/utils/math/SafeCast.sol",
+      "sha256": "9769274bf53f26a7c7896c526ea1980dc9bea5bf5c2a5fd04870008c4afc1de9"
+    },
+    "@openzeppelin/contracts/utils/structs/EnumerableSet.sol": {
+      "origin": {
+        "commit": "e4f70216d759d8e6a64144a9e1f7bbeed78e7079",
+        "license": "MIT; notices preserved in each exact source",
+        "literalInputOrigin": "deployments/pharos_pacific_mainnet/solcInputs/4475c0eedef52cd212156bb08168ed9b.json",
+        "path": "contracts/utils/structs/EnumerableSet.sol",
+        "repository": "https://github.com/OpenZeppelin/openzeppelin-contracts",
+        "version": "5.3.0"
+      },
+      "path": "lib/openzeppelin-contracts/utils/structs/EnumerableSet.sol",
+      "sha256": "111c83d836d9c73a99f58ac17ff03ad515858c1098fb795c9f07004204b5e5fb"
+    },
+    "contracts/interfaces/pharos/IOracle.sol": {
+      "origin": {
+        "commit": "8943b4b2247354ccb5dc0c314649fe656517d3af",
+        "path": "contracts/interfaces/pharos/IOracle.sol",
+        "repository": "vETH-3.0-contract",
+        "sourceChangeCommit": "6338c28831b634abfa8d671ce508cb84b8f4f962"
+      },
+      "path": "contracts/interfaces/pharos/IOracle.sol",
+      "sha256": "ed03e9063b6cc1fcb9f6f3a19074d3f9f132b553da115af5daec46f631d1a825"
+    },
+    "contracts/interfaces/pharos/IStaking.sol": {
+      "origin": {
+        "commit": "8943b4b2247354ccb5dc0c314649fe656517d3af",
+        "path": "contracts/interfaces/pharos/IStaking.sol",
+        "repository": "vETH-3.0-contract",
+        "sourceChangeCommit": "213d4bf1fe6ff7f1a36697aca9086a52331bd40a"
+      },
+      "path": "contracts/interfaces/pharos/IStaking.sol",
+      "sha256": "c84976cc3f012c9495cf0919aa1978d786aad7a63eaad1c2f3db44e9b9ab0d02"
+    },
+    "contracts/pharos/SlpPharosProxy.sol": {
+      "origin": {
+        "commit": "8943b4b2247354ccb5dc0c314649fe656517d3af",
+        "path": "contracts/pharos/SlpPharosProxy.sol",
+        "repository": "vETH-3.0-contract",
+        "sourceChangeCommit": "efc989b032a1ecd30a06bd62ddf343b48d9c8f57"
+      },
+      "path": "contracts/pharos/SlpPharosProxy.sol",
+      "sha256": "ff6cf0a4c33ad83636c845077355a259aadb74ccefe1c92238fbdb4a85c3ca01"
+    },
+    "contracts/pharos/SlpPharosRewardsVault.sol": {
+      "origin": {
+        "commit": "8943b4b2247354ccb5dc0c314649fe656517d3af",
+        "path": "contracts/pharos/SlpPharosRewardsVault.sol",
+        "repository": "vETH-3.0-contract",
+        "sourceChangeCommit": "dc7df6abc7f29eec40d508540e926cd11d09d364"
+      },
+      "path": "contracts/pharos/SlpPharosRewardsVault.sol",
+      "sha256": "200d1d29509356ea5d943d313218c9ca5edddbcddbfe49aea1724088e5f887fd"
+    }
+  }
+}

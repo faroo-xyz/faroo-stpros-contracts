@@ -1,0 +1,19 @@
+{
+  "originRepository": "vETH-3.0-contract",
+  "originHead": "f7c07a8285d1f6e3b2a18dcb57b3a776b26c91b6",
+  "scope": "Frozen historical checker evidence; not an active CLI or current role assertion",
+  "files": {
+    "constants/constants.ts": {
+      "sha256": "a611c20a4985d8474863e0c3213bf7c0a589bedba1eef7bc7ba80cc1f71890e6",
+      "excerpt": "[CHAIN_ID.PHAROS_PACIFIC_MAINNET]: '0x3658e00f5DDb9Fa0c7e9820e8d16C3C17eaB73CA'"
+    },
+    "tasks/SlpPharosProxy.ts": {
+      "sha256": "33820d9c61602b6caf8f11a8f03de1e6e2720956df247800033a459b7662cd0c",
+      "excerpt": "        expect(await slpPharosProxy.hasRole(DEFAULT_ADMIN_ROLE, MULTISIG_ADDRESS[chainId])).to.be.true;"
+    },
+    "tasks/SlpPharosRewardsVault.ts": {
+      "sha256": "27c356d436dddfc136656b65c27205a3a041eb55054b03a7aa5397733bfd57b8",
+      "excerpt": "    expect(await vault.hasRole(DEFAULT_ADMIN_ROLE, MULTISIG_ADDRESS[chainId])).to.be.true;"
+    }
+  }
+}

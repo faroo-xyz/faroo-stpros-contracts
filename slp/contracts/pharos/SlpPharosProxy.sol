@@ -37,6 +37,10 @@ contract SlpPharosProxy is AccessControlEnumerableUpgradeable, ReentrancyGuardUp
         uint256 _totalBonded;
         /// @notice Total amount unbonded.
         uint256 _totalUnbonded;
+        /// @notice Total amount of rewards claimed from Pharos via claimReward / batchClaimReward.
+        uint256 _totalRewardClaimed;
+        /// @notice Total amount transferred to the rewards vault via transferToRewardsVault.
+        uint256 _totalRewardTransferred;
     }
 
     /// @notice Pharos Staking contract address.
@@ -90,6 +94,10 @@ contract SlpPharosProxy is AccessControlEnumerableUpgradeable, ReentrancyGuardUp
     /// @param sender The address that initiated the transfer back.
     /// @param amount The amount of collateral transferred back.
     event TransferredBack(address indexed sender, uint256 amount);
+    /// @notice Emitted when funds are transferred to the rewards vault.
+    /// @param sender The address that initiated the transfer.
+    /// @param amount The amount transferred to the rewards vault.
+    event TransferredToRewardsVault(address indexed sender, uint256 amount);
     /// @notice Emitted when ETH is deposited to the contract.
     /// @param sender The address that deposited ETH.
     /// @param amount The amount of ETH deposited.
@@ -295,34 +303,48 @@ contract SlpPharosProxy is AccessControlEnumerableUpgradeable, ReentrancyGuardUp
         }
     }
 
-    /// @notice Claims rewards for a specified validator pool and transfer to rewards vault
+    /// @notice Claims rewards for a specified validator pool into this contract.
     /// @param poolId The pool id of the validator for which rewards will be claimed.
-    function claimRewardToRewardsVault(bytes32 poolId) external nonReentrant onlyRole(WHITELIST_ROLE) checkPoolIdExists(poolId) {
+    /// @dev Pharos does not transfer the reward synchronously: `STAKING.claimReward` only emits `CoinMinted` and the
+    ///      node credits the minted amount to this contract after the transaction has executed. The funds are
+    ///      therefore NOT available within this transaction; forward them later with `transferToRewardsVault`.
+    /// @dev The claimed amount is accumulated in `totalRewardClaimed` for reconciliation.
+    /// @dev Reverts (from Pharos) with "No rewards to claim" if the pool has no claimable reward.
+    /// @dev Only accounts with the WHITELIST_ROLE can call this function.
+    function claimReward(bytes32 poolId) external nonReentrant onlyRole(WHITELIST_ROLE) checkPoolIdExists(poolId) {
         uint256 rewardAmount = STAKING.claimReward(poolId);
-        Address.sendValue(payable(getSlpPharosProxyStorage()._rewardsVault), rewardAmount);
+        getSlpPharosProxyStorage()._totalRewardClaimed += rewardAmount;
 
         emit RewardClaimed(msg.sender, poolId, rewardAmount);
     }
 
-    /// @notice Claims rewards from multiple validator pools and forwards them to the rewards vault in a single transaction.
+    /// @notice Claims rewards from multiple validator pools into this contract in a single transaction.
     /// @param poolIds The pool ids of the validators for which rewards will be claimed.
-    /// @dev Rewards are claimed pool by pool and forwarded to the rewards vault as one aggregated transfer at the end,
-    ///      so the vault sees a single deposit while one RewardClaimed event is still emitted per pool.
-    /// @dev The call reverts entirely if any pool id is not registered or any single claim fails.
+    /// @dev Same semantics as `claimReward` for each pool: nothing is forwarded to the rewards vault here, use
+    ///      `transferToRewardsVault` once Pharos has credited the minted rewards.
+    /// @dev Pools whose claimable reward (per `STAKING.getDelegatorReward`) is zero are skipped instead of
+    ///      reverting the whole batch, since Pharos' `claimReward` reverts on a zero reward. Skipped pools emit no
+    ///      event. The view never over-reports what `claimReward` will settle, so a non-zero check cannot revert;
+    ///      it may under-report catch-up rewards of freshly activated stake, which are simply claimed next time.
+    /// @dev Emits one RewardClaimed event per claimed pool. The call still reverts entirely if any pool id is not
+    ///      registered or a claim fails for another reason.
     /// @dev Only accounts with the WHITELIST_ROLE can call this function.
-    function batchClaimRewardToRewardsVault(bytes32[] calldata poolIds) external nonReentrant onlyRole(WHITELIST_ROLE) {
+    function batchClaimReward(bytes32[] calldata poolIds) external nonReentrant onlyRole(WHITELIST_ROLE) {
         SlpPharosProxyStorage storage $ = getSlpPharosProxyStorage();
         uint256 totalRewardAmount = 0;
 
         for (uint256 i = 0; i < poolIds.length; ++i) {
             require($._poolIds.contains(poolIds[i]), PoolIdNotRegistered());
+            if (STAKING.getDelegatorReward(poolIds[i], address(this)) == 0) {
+                continue;
+            }
             uint256 rewardAmount = STAKING.claimReward(poolIds[i]);
             totalRewardAmount += rewardAmount;
 
             emit RewardClaimed(msg.sender, poolIds[i], rewardAmount);
         }
 
-        Address.sendValue(payable($._rewardsVault), totalRewardAmount);
+        $._totalRewardClaimed += totalRewardAmount;
     }
 
     /// @notice Compounds rewards for a specified validator pool.
@@ -365,6 +387,24 @@ contract SlpPharosProxy is AccessControlEnumerableUpgradeable, ReentrancyGuardUp
         Address.sendValue(payable($._bridgeVault), amount);
 
         emit TransferredBack(msg.sender, amount);
+    }
+
+    /// @notice Transfers a specified amount from the contract balance to the rewards vault.
+    /// @param amount The amount to transfer to the rewards vault.
+    /// @dev Intended for forwarding rewards previously claimed via `claimReward` / `batchClaimReward`, once Pharos
+    ///      has credited the minted amount to this contract (the next block at the latest). The vault reports every
+    ///      deposit to the vToken oracle as new rewards, so only reward funds should be sent here; principal goes
+    ///      back through `transferBack`.
+    /// @dev `totalRewardClaimed() - totalRewardTransferred()` gives the amount still waiting to be forwarded.
+    /// @dev Only accounts with the WHITELIST_ROLE can call this function.
+    /// @dev Emits a TransferredToRewardsVault event upon successful transfer.
+    function transferToRewardsVault(uint256 amount) external nonReentrant onlyRole(WHITELIST_ROLE) {
+        require(amount <= address(this).balance, InsufficientBalance());
+        SlpPharosProxyStorage storage $ = getSlpPharosProxyStorage();
+        $._totalRewardTransferred += amount;
+        Address.sendValue(payable($._rewardsVault), amount);
+
+        emit TransferredToRewardsVault(msg.sender, amount);
     }
 
     /// @notice Updates the bridge vault address used by transferBack.
@@ -412,5 +452,17 @@ contract SlpPharosProxy is AccessControlEnumerableUpgradeable, ReentrancyGuardUp
     /// @return The total unbonded amount.
     function totalUnbonded() external view returns (uint256) {
         return getSlpPharosProxyStorage()._totalUnbonded;
+    }
+
+    /// @notice Returns the total amount of rewards claimed from Pharos via claimReward / batchClaimReward.
+    /// @return The total claimed reward amount.
+    function totalRewardClaimed() external view returns (uint256) {
+        return getSlpPharosProxyStorage()._totalRewardClaimed;
+    }
+
+    /// @notice Returns the total amount transferred to the rewards vault via transferToRewardsVault.
+    /// @return The total amount transferred to the rewards vault.
+    function totalRewardTransferred() external view returns (uint256) {
+        return getSlpPharosProxyStorage()._totalRewardTransferred;
     }
 }

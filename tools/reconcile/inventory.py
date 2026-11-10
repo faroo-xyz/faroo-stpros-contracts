@@ -99,13 +99,21 @@ def discover():
             addr = row['address'].lower()
             targets[addr] = dict(name=row['name'], address=addr, start=number(rec['receipt']['blockNumber']),
                                  abi=rec['abi'], abiStatus='RECORDED', known={})
+    from .slp_provider import LocalProvider
+    provider = LocalProvider(ROOT / 'slp')
     for row in registry['external']:
         if row['name'] == 'WPROS':
             continue
         addr = row['address'].lower()
-        source = 'contracts/SlpPharosRewardsVault.sol' if 'RewardsVault' in row['name'] else 'contracts/SlpPharosProxy.sol'
+        instance = provider.instances.get(addr)
+        if instance is None:
+            from .storage import EvidenceError
+            raise EvidenceError('unknown registered SLP identity')
         targets[addr] = dict(name=row['name'], address=addr, start=start,
-                             abi=source_event_hints(ROOT / source), abiStatus='UNVERIFIED_SOURCE_HINT', known={})
+                             abi=instance['record']['abi'] + PROXY_ABI,
+                             abiStatus='RECORDED_LOCAL_ORIGIN_MANIFEST', known={})
+    for rel in ('build-reference.json', 'DEPENDENCIES.json', 'deployments/PROVENANCE.json'):
+        files['slp/' + rel] = digest(provider.read(rel))
     for rel in ['deployments/registry.json', 'deployments/mainnet/v4/addresses.json',
                 'deployments/mainnet/v4/V4_UpgradeReceipt.json', 'snapshots/deployed/provenance.json',
                 'tools/ci/r4-reference.json']:
@@ -113,12 +121,12 @@ def discover():
     for p in sorted((ROOT / 'contracts').rglob('*.sol')):
         if 'release' not in p.parts:
             files[str(p.relative_to(ROOT))] = digest(safe(p).read_bytes())
-    return {'chainId': 1672, 'sourceCommit': subprocess.check_output(
-        ['git', '-C', str(ROOT), 'rev-parse', 'HEAD'], text=True).strip(),
+    return {'chainId': 1672, 'sourceCommit': (read(ROOT / 'EXPORT-MANIFEST.txt')['sourceHead'] if (ROOT / 'EXPORT-MANIFEST.txt').exists() else subprocess.check_output(
+        ['git', '-C', str(ROOT), 'rev-parse', 'HEAD'], text=True).strip()),
         'targets': targets, 'implementations': implementations,
         'files': files, 'legacySources': sources, 'release': registry['release'],
         'addresses': address_table, 'start': min(t['start'] for t in targets.values()),
-        'limitations': ['External SLP/RewardsVault deployment-source identity is unverified.',
+        'limitations': ['SLP recorded local build identity is verified; live implementation/history still requires snapshot attestation.',
                          'Underlying Pharos Staking verified ABI/source is absent; principal positions cannot be attested.',
                          'V4 bytecode/source mapping uses recorded canonical artifact identities; recompilation NOT RUN.']}
 

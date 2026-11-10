@@ -50,9 +50,8 @@ flowchart LR
     PS -- "claimStake: stake returned" --> SP
     SP -- "transferBack" --> SD
     SD -- "keeper allocation" --> BV
-    SD -- "reconciled rewards only" --> RV
-    PS -- "claimReward" --> SP
-    SP -- "rewards" --> RV
+    PS -- "node credit after claimReward transaction" --> SP
+    SP -- "later transferToRewardsVault" --> RV
     RV -. "update(WPROS, amount)" .-> OR
     RV -- "reported PROS" --> SP
     ST -. "onMint / onRedeem, exchange rate" .-> OR
@@ -62,7 +61,7 @@ flowchart LR
     U -- "stPROS" --> YV
 ```
 
-The SlpDistributor → RewardsVault route is for reconciled reward funds only, never user principal; see
+The current SlpDistributor whitelist excludes RewardsVault. SLP operators forward reconciled rewards separately; see
 [SLP staking](docs/SLP-STAKING.md). [Architecture](docs/ARCHITECTURE.md) explains each contract and flow.
 
 ## Mainnet deployment
@@ -123,8 +122,10 @@ Maintainers preparing a future upgrade also read [Upgrades](docs/UPGRADES.md).
 | Core audit package | The 12 core files at frozen commit `a110037`: StPROS, VToken, Oracle, BridgeVault, SlpDistributor, YieldVault, YieldVaultFactory, GuardedOwnableUpgradeable, MigrationGuard, ReleaseAssertions, IOracle, IWPROS | Frozen audit package prepared for external audit. This repository records neither its delivery to an auditor nor a completed external audit report |
 | SLP Extension | `SlpPharosProxy`, `SlpPharosRewardsVault` | Not in the `a110037` package. The owner reports that the ABDK statement of work lists it as a separate scope; that document is not stored here. **These two contracts must not be considered externally audited** |
 
-Internal reviews are not an external audit. The SLP contracts are deployed and administered outside this repository's
-release process ([deployment status](docs/SLP-STAKING.md#deployment-status)).
+Internal reviews are not an external audit. `slp/` is the authoritative maintenance module for both deployed SLP
+implementations, with its own exact-byte build and tests. Its three proxies use a separate ProxyAdmin owned by the
+Timelock; all three DEFAULT_ADMIN_ROLE holders are the Timelock. See the dated
+[current SLP baseline](docs/SLP-STAKING.md#deployment-status).
 
 ## License
 

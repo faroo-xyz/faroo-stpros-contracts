@@ -1,0 +1,127 @@
+{
+  "attestedAt": {
+    "historical": {
+      "hash": "0x48563791c4c5c1dad91d3c832ac0c559fbc5b1fe250c12142b6290145cfad6bf",
+      "number": 21647956
+    },
+    "operator": "0x8736e68f37c1156e09445ac2d395a139e58fcab4",
+    "phase1": {
+      "hash": "0x30f9016ffa796da9c11c02db720c2909db182575d7aa447d0452543221f99cf6",
+      "number": 22633551
+    },
+    "roleOwner": "0xc30db0543412c6881a543390d2c21fbbff42805b",
+    "scope": "Carried Phase 1 observation; this build performs no RPC"
+  },
+  "chainId": 1672,
+  "instances": {
+    "SlpPharosProxy": {
+      "aggregateRecord": "deployments/pharos_pacific_mainnet/SlpPharosProxy.json",
+      "contract": "SlpPharosProxy",
+      "implementation": "0xc3d088842dcf02c13699f936bb83dfbbc6f721ab",
+      "implementationRecord": "deployments/pharos_pacific_mainnet/SlpPharosProxy_Implementation.json",
+      "implementationRuntimeKeccak": "0x48686658ca6bf1f01e3f47ddadc34c1531b4104c2c5ed12ca785fcf235fc0aa3",
+      "proxy": "0xec1d6163e05b3f5d0fb8f354881f6c8b793ad612",
+      "proxyAdmin": "0x480eb384681777bf21e72b8c8538987c2801b4b7",
+      "proxyRecord": "deployments/pharos_pacific_mainnet/SlpPharosProxy_Proxy.json",
+      "proxyRuntimeKeccak": "0xe5e3693157141608a301682c8c228c0277eac7efc0b98b57f874ca49752b5fd8"
+    },
+    "SlpPharosProxy_1": {
+      "aggregateRecord": "deployments/pharos_pacific_mainnet/SlpPharosProxy_1.json",
+      "contract": "SlpPharosProxy",
+      "implementation": "0xd15e3eb96409ff2c5be569d132a4520e324a1124",
+      "implementationRecord": "deployments/pharos_pacific_mainnet/SlpPharosProxy_1_Implementation.json",
+      "implementationRuntimeKeccak": "0x48686658ca6bf1f01e3f47ddadc34c1531b4104c2c5ed12ca785fcf235fc0aa3",
+      "proxy": "0xc53d2c9dd1e488e23ff77e219ca68d8138f90c2c",
+      "proxyAdmin": "0x480eb384681777bf21e72b8c8538987c2801b4b7",
+      "proxyRecord": "deployments/pharos_pacific_mainnet/SlpPharosProxy_1_Proxy.json",
+      "proxyRuntimeKeccak": "0xe5e3693157141608a301682c8c228c0277eac7efc0b98b57f874ca49752b5fd8"
+    },
+    "SlpPharosRewardsVault": {
+      "aggregateRecord": "deployments/pharos_pacific_mainnet/SlpPharosRewardsVault.json",
+      "contract": "SlpPharosRewardsVault",
+      "implementation": "0xe6985303e0c917bda24c4566bb2f9af99916c531",
+      "implementationRecord": "deployments/pharos_pacific_mainnet/SlpPharosRewardsVault_Implementation.json",
+      "implementationRuntimeKeccak": "0x08c89ff66bb36f6ca361f89c06a45cbd79b480e5c5201b3cc93a4833318c50eb",
+      "proxy": "0xd0c44d3079e97ff285dd7a3e4e0246320a9487e5",
+      "proxyAdmin": "0x480eb384681777bf21e72b8c8538987c2801b4b7",
+      "proxyRecord": "deployments/pharos_pacific_mainnet/SlpPharosRewardsVault_Proxy.json",
+      "proxyRuntimeKeccak": "0xe5e3693157141608a301682c8c228c0277eac7efc0b98b57f874ca49752b5fd8"
+    }
+  },
+  "originCommit": "8943b4b2247354ccb5dc0c314649fe656517d3af",
+  "originRepository": "vETH-3.0-contract",
+  "policy": "Append-only original deployment bytes; no present-day role claims inferred from constructor arguments. No execution route.",
+  "proxyAdmin": {
+    "address": "0x480eb384681777bf21e72b8c8538987c2801b4b7",
+    "record": "deployments/pharos_pacific_mainnet/DefaultProxyAdmin.json",
+    "runtimeKeccak": "0xfdb374f62c5df71a60c5965707d6653c4910b1e309693a88263492ade756df11"
+  },
+  "records": {
+    "deployments/pharos_pacific_mainnet/.chainId": {
+      "originCommit": "8943b4b2247354ccb5dc0c314649fe656517d3af",
+      "originPath": "deployments/pharos_pacific_mainnet/.chainId",
+      "sha256": "aeba47c17ca09557808c333b49af210a0209aff6b4334fa7192aaed69c5f36dd"
+    },
+    "deployments/pharos_pacific_mainnet/DefaultProxyAdmin.json": {
+      "originCommit": "8943b4b2247354ccb5dc0c314649fe656517d3af",
+      "originPath": "deployments/pharos_pacific_mainnet/DefaultProxyAdmin.json",
+      "sha256": "8e565a2399c050b44b8506bca70f5dfbe87c159ee7d980af1cc40050133ee4eb"
+    },
+    "deployments/pharos_pacific_mainnet/SlpPharosProxy.json": {
+      "originCommit": "8943b4b2247354ccb5dc0c314649fe656517d3af",
+      "originPath": "deployments/pharos_pacific_mainnet/SlpPharosProxy.json",
+      "sha256": "9c2724dd20e3902c7ac35e10f6666f7c031d1f6a62d75dcb0a83e7161427a0f7"
+    },
+    "deployments/pharos_pacific_mainnet/SlpPharosProxy_1.json": {
+      "originCommit": "8943b4b2247354ccb5dc0c314649fe656517d3af",
+      "originPath": "deployments/pharos_pacific_mainnet/SlpPharosProxy_1.json",
+      "sha256": "ce53660f41438d54d50a51fa5574796ebba8b8faa2fa2aaed2dbace7fd759c56"
+    },
+    "deployments/pharos_pacific_mainnet/SlpPharosProxy_1_Implementation.json": {
+      "originCommit": "8943b4b2247354ccb5dc0c314649fe656517d3af",
+      "originPath": "deployments/pharos_pacific_mainnet/SlpPharosProxy_1_Implementation.json",
+      "sha256": "bb281546411710e68a82c9e478e4f13d0b6bc0ac2b48a369c4c2b647fc612a29"
+    },
+    "deployments/pharos_pacific_mainnet/SlpPharosProxy_1_Proxy.json": {
+      "originCommit": "8943b4b2247354ccb5dc0c314649fe656517d3af",
+      "originPath": "deployments/pharos_pacific_mainnet/SlpPharosProxy_1_Proxy.json",
+      "sha256": "9b6eb91b58bf246444ebdc3dbfbaecfa4100bd2ecff8a2a8b31530da8fc63fd1"
+    },
+    "deployments/pharos_pacific_mainnet/SlpPharosProxy_Implementation.json": {
+      "originCommit": "8943b4b2247354ccb5dc0c314649fe656517d3af",
+      "originPath": "deployments/pharos_pacific_mainnet/SlpPharosProxy_Implementation.json",
+      "sha256": "13355b65a3583dca805d67a3b271fb2ae509ba0b92de645b06d23348d1afeb16"
+    },
+    "deployments/pharos_pacific_mainnet/SlpPharosProxy_Proxy.json": {
+      "originCommit": "8943b4b2247354ccb5dc0c314649fe656517d3af",
+      "originPath": "deployments/pharos_pacific_mainnet/SlpPharosProxy_Proxy.json",
+      "sha256": "94bb2f4a91e43085e691b670708308869d65a0b3b2d6852088e9cf4538f79efd"
+    },
+    "deployments/pharos_pacific_mainnet/SlpPharosRewardsVault.json": {
+      "originCommit": "8943b4b2247354ccb5dc0c314649fe656517d3af",
+      "originPath": "deployments/pharos_pacific_mainnet/SlpPharosRewardsVault.json",
+      "sha256": "b8791e8a9b99bc62880af80451ac6ade4ba30bc5a5936c4acb1bde922a866e47"
+    },
+    "deployments/pharos_pacific_mainnet/SlpPharosRewardsVault_Implementation.json": {
+      "originCommit": "8943b4b2247354ccb5dc0c314649fe656517d3af",
+      "originPath": "deployments/pharos_pacific_mainnet/SlpPharosRewardsVault_Implementation.json",
+      "sha256": "8432ea786d6f4fb1d304e0fc53713cc48e507d5912089848abdeb545feff0fb7"
+    },
+    "deployments/pharos_pacific_mainnet/SlpPharosRewardsVault_Proxy.json": {
+      "originCommit": "8943b4b2247354ccb5dc0c314649fe656517d3af",
+      "originPath": "deployments/pharos_pacific_mainnet/SlpPharosRewardsVault_Proxy.json",
+      "sha256": "f43b89a3ba40f2cb674ec33277ce9d053bd9afc1d1e1f25006fdd696ae50da19"
+    },
+    "deployments/pharos_pacific_mainnet/solcInputs/2ac2454935e265547fc7a8f51f3bafcf.json": {
+      "originCommit": "8943b4b2247354ccb5dc0c314649fe656517d3af",
+      "originPath": "deployments/pharos_pacific_mainnet/solcInputs/2ac2454935e265547fc7a8f51f3bafcf.json",
+      "sha256": "cc8be0fd8a6eb79022d46714267b519e555b020a3d8a18a1ec7f05d0ff018188"
+    },
+    "deployments/pharos_pacific_mainnet/solcInputs/4475c0eedef52cd212156bb08168ed9b.json": {
+      "originCommit": "8943b4b2247354ccb5dc0c314649fe656517d3af",
+      "originPath": "deployments/pharos_pacific_mainnet/solcInputs/4475c0eedef52cd212156bb08168ed9b.json",
+      "sha256": "670990050d455ac37bb78161cdfb6deefe4697a5a0f4d02cfa89d5c95700b952"
+    }
+  },
+  "schema": "faroo-slp-deployments-v1"
+}
