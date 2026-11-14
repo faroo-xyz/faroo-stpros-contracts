@@ -11,7 +11,7 @@ import stat
 import subprocess
 
 ROOT = Path(__file__).resolve().parents[2]
-ALLOW = ('contracts', 'tests', 'tools', 'lib', 'snapshots', 'deployments', 'docs', 'slp',
+ALLOW = ('contracts', 'tests', 'tools', 'lib', 'snapshots', 'deployments', 'docs', 'slp', 'faroswap',
          'foundry.toml', 'README.md', 'Makefile')
 # Owner-local Agent configuration is never exported, whether tracked, untracked or absent.
 LOCAL_AGENT = ('agents.md', 'agent.md', '.claude')

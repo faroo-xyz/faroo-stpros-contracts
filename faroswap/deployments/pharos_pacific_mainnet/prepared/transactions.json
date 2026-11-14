@@ -1,0 +1,266 @@
+{
+  "schema": "faroswap-deployment-plan-v2",
+  "network": "pharos-pacific-mainnet-1672",
+  "preparedAt": "2026-11-13T21:57:27+0800",
+  "preparedBlock": 22936700,
+  "readOnly": true,
+  "validation": {
+    "gspFactory": "0xd15f2d50bbf777efd529052686d0703e498f8380",
+    "gspTemplate": "0x81b04c62c53a716b7b5ce7fe8de42ab665bca935",
+    "templateRuntimeKeccak": "0xb0bf3be474fb6a7bdfe8c2ee8e7d5f98fd46a44153f8c7b5aa8b8a86ce7cd3e1",
+    "templateMatchesPinnedSource": true,
+    "sourcePin": "Faroswap/contracts@41fefb37ae11ca6be98b6cb17977ef9f6375cf6a + OZ 4.9.3 + solc 0.8.16 (london, optimizer 200)",
+    "vaultRateAtBlock": {
+      "block": 22936700,
+      "convertToAssets1e18": 1009531657654669604,
+      "oracleCrossCheck": 1009531657654669604
+    },
+    "stprosWprosRegistryPoolsBeforeDeployment": 3,
+    "registryPools": [
+      "0xc8f4a61627bfbe999ff0371a6680dcd4674c23fb",
+      "0x9393d3fb23fb1093ea88ef39a5b50fbf4e88c922",
+      "0x7241784fdb0f1f31c617c8a37cbdbaa69de6801b"
+    ],
+    "deployerState": {
+      "nonceLatest": 45,
+      "noncePending": 45,
+      "baseNonceUsedForPrediction": 45,
+      "nativeProSWei": 31340626273498999481,
+      "stprosWei": 0,
+      "wprosWei": 0,
+      "bootstrapQuoteNeededWei": 10095316576546696,
+      "balancesSufficient": false,
+      "fundingStepsIncludedInSequence": true,
+      "nativeRequiredWei": 1022209696468402731
+    },
+    "problems": [],
+    "warnings": [
+      "deployer token balances short (stPROS 0, WPROS 0); funding steps 6a/6b are included in the sequence and resolve this at execution"
+    ]
+  },
+  "protocolConstants": {
+    "stprosVault": "0x6b0a44c64190279f7034b77c13a566e914fe5ec4",
+    "wpros": "0x52c48d4213107b20bc583832b0d951fb9ca8f0b0",
+    "govSafe": "0x3658e00f5ddb9fa0c7e9820e8d16c3c17eab73ca",
+    "deployerAndFunder": "0x8ce84e9fa0101d317d8956d73610ad3e0e219d41",
+    "lpFeeRate": 500000000000000,
+    "mtFeeRate": 0,
+    "k": 2000000000000000,
+    "priceLimit": 10000,
+    "isOpenTWAP": false,
+    "bootstrapBaseAmount": 10000000000000000,
+    "bootstrapQuoteAmountAtPreparedRate": 10095316576546696,
+    "bootstrapExpectedFirstMintShares": 9999999999998999,
+    "bootstrapQuoteDerivation": "quote = floor(0.01e18 * i / 1e18) using the SAME rate the pool is created with (the pool's own i, not a fresh vault read): the bootstrap enforces exact inputs and shares == 0.01e18 - 1001"
+  },
+  "deployerSequence": [
+    {
+      "key": "implementation",
+      "action": "deploy FaroSwapPriceManager implementation",
+      "creates": true,
+      "nonce": 45,
+      "predictedAddress": "0x167989ad7d2547f4477d53f01d4316b155ab4531"
+    },
+    {
+      "key": "proxy",
+      "action": "deploy ERC1967Proxy (Price Manager proxy)",
+      "creates": true,
+      "nonce": 46,
+      "predictedAddress": "0x7732fca644a733490ee90d648196bed8bf5871a3"
+    },
+    {
+      "key": "pool",
+      "action": "GSPFactory.createDODOGasSavingPool (consumes a deployer nonce)",
+      "creates": false,
+      "nonce": 47
+    },
+    {
+      "key": "bootstrap",
+      "action": "deploy FaroSwapPoolBootstrap (needs the pool address)",
+      "creates": true,
+      "nonce": 48,
+      "predictedAddress": "0x9d4c4455b12c23efe7169b317ed8af582a441dda"
+    },
+    {
+      "key": "fund-wpros",
+      "action": "WPROS.deposit{value}() - wrap native for the quote leg",
+      "creates": false,
+      "conditional": true,
+      "nonce": 49
+    },
+    {
+      "key": "fund-stpros",
+      "action": "stPROS.depositWithPROS{value}() - mint stPROS for the base leg",
+      "creates": false,
+      "conditional": true,
+      "nonce": 50
+    },
+    {
+      "key": "approve-base",
+      "action": "funder approves exact base amount",
+      "creates": false,
+      "nonce": 51
+    },
+    {
+      "key": "approve-quote",
+      "action": "funder approves exact quote amount",
+      "creates": false,
+      "nonce": 52
+    },
+    {
+      "key": "execute",
+      "action": "funder executes the atomic bootstrap",
+      "creates": false,
+      "nonce": 53
+    }
+  ],
+  "interleavedSafeTransactions": [
+    "setExecutor(executor, true) after the proxy exists \u2014 no deployer nonce consumed",
+    "bindPool(pool) after the factory creation \u2014 no deployer nonce consumed"
+  ],
+  "predictedAddresses": {
+    "note": "CREATE predictions follow the ordered DEPLOYER_SEQUENCE from the pending/latest nonce; ANY other deployer transaction shifts every subsequent address - regenerate before broadcasting",
+    "priceManagerImplementation": "0x167989ad7d2547f4477d53f01d4316b155ab4531",
+    "priceManagerProxy": "0x7732fca644a733490ee90d648196bed8bf5871a3",
+    "poolBootstrap": "0x9d4c4455b12c23efe7169b317ed8af582a441dda",
+    "poolCreationTxNonce": 47,
+    "gspPool": "non-deterministic (EIP-1167 create via factory; read from the NewGSP event / registry tail after tx)"
+  },
+  "transactions": [
+    {
+      "step": 1,
+      "title": "deploy FaroSwapPriceManager implementation",
+      "from": "0x8ce84e9fa0101d317d8956d73610ad3e0e219d41",
+      "kind": "CREATE",
+      "consumesDeployerNonce": 45,
+      "constructorArgs": [
+        "0x6b0a44c64190279f7034b77c13a566e914fe5ec4",
+        "0x52c48d4213107b20bc583832b0d951fb9ca8f0b0",
+        "0xd15f2d50bbf777efd529052686d0703e498f8380",
+        "0x81b04c62c53a716b7b5ce7fe8de42ab665bca935",
+        "500000000000000",
+        "0",
+        "2000000000000000",
+        "10000"
+      ],
+      "expectedAddress": "0x167989ad7d2547f4477d53f01d4316b155ab4531"
+    },
+    {
+      "step": 2,
+      "title": "deploy ERC1967Proxy (Price Manager proxy, initialize -> Safe)",
+      "from": "0x8ce84e9fa0101d317d8956d73610ad3e0e219d41",
+      "kind": "CREATE",
+      "consumesDeployerNonce": 46,
+      "constructorArgs": [
+        "<implementation = step 1 address>",
+        "0xc4d66de80000000000000000000000003658e00f5ddb9fa0c7e9820e8d16c3c17eab73ca"
+      ],
+      "expectedAddress": "0x7732fca644a733490ee90d648196bed8bf5871a3",
+      "note": "ERC1967Proxy from the frozen OZ 5.6.1 vendor closure; proxy admin stays zero (UUPS style)"
+    },
+    {
+      "step": 3,
+      "title": "Safe: explicitly authorize the sync executor",
+      "via": "0x3658e00f5ddb9fa0c7e9820e8d16c3c17eab73ca",
+      "to": "0x7732fca644a733490ee90d648196bed8bf5871a3",
+      "calldataStatus": "INCOMPLETE - executor address not yet chosen; regenerate this package once known",
+      "calldataWhenKnown": "0x1e1bff3f<executor-pad32><0001>",
+      "verification": "cast call 0x7732fca644a733490ee90d648196bed8bf5871a3 'isExecutor(address)(bool)' <executor> -> true"
+    },
+    {
+      "step": 4,
+      "title": "create the public GSP pool through the real Factory",
+      "from": "0x8ce84e9fa0101d317d8956d73610ad3e0e219d41",
+      "to": "0xd15f2d50bbf777efd529052686d0703e498f8380",
+      "kind": "CALL",
+      "consumesDeployerNonce": 47,
+      "calldata": "0x9f5755930000000000000000000000007732fca644a733490ee90d648196bed8bf5871a30000000000000000000000006b0a44c64190279f7034b77c13a566e914fe5ec400000000000000000000000052c48d4213107b20bc583832b0d951fb9ca8f0b00000000000000000000000000000000000000000000000000001c6bf5263400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000e0293b1a404912400000000000000000000000000000000000000000000000000071afd498d000000000000000000000000000000000000000000000000000000000000000027100000000000000000000000000000000000000000000000000000000000000000",
+      "note": "permissionless; admin = PM proxy; maintainer forced to the factory default; re-read the rate immediately before signing and abort on drift; if the rate changed, regenerate steps 4+ (pool i, quote amount and every later address move with the nonce)",
+      "post": "cast call 0xd15f2d50bbf777efd529052686d0703e498f8380 'getDODOPool(address,address)(address[])' 0x6b0a44c64190279f7034b77c13a566e914fe5ec4 0x52c48d4213107b20bc583832b0d951fb9ca8f0b0 -> last element is the new pool"
+    },
+    {
+      "step": 5,
+      "title": "Safe: one-time bindPool (full validation, permanent)",
+      "via": "0x3658e00f5ddb9fa0c7e9820e8d16c3c17eab73ca",
+      "to": "0x7732fca644a733490ee90d648196bed8bf5871a3",
+      "calldataStatus": "INCOMPLETE - pool address exists only after step 4 lands",
+      "calldataWhenKnown": "0x5a73fae2<pool-pad32>",
+      "noteOnChainChecks": "bindPool itself enforces: clone-of-verified-template, admin==proxy, token direction, i>0, exact creation economics, EMPTY pool (totalSupply==0), initial i within the pool's own 1% priceLimit of the live vault rate, and factory registry membership",
+      "verification": "cast call 0x7732fca644a733490ee90d648196bed8bf5871a3 'pool()(address)' -> <pool>; 'poolBound()(bool)' -> true"
+    },
+    {
+      "step": 6,
+      "title": "deploy FaroSwapPoolBootstrap",
+      "from": "0x8ce84e9fa0101d317d8956d73610ad3e0e219d41",
+      "kind": "CREATE",
+      "consumesDeployerNonce": 48,
+      "constructorArgs": [
+        "<pool = step 4 result>",
+        "0x6b0a44c64190279f7034b77c13a566e914fe5ec4",
+        "0x52c48d4213107b20bc583832b0d951fb9ca8f0b0",
+        "0x8ce84e9fa0101d317d8956d73610ad3e0e219d41",
+        "0x3658e00f5ddb9fa0c7e9820e8d16c3c17eab73ca",
+        "10000000000000000",
+        "<quoteAmount = floor(0.01e18 * poolI / 1e18)>"
+      ],
+      "expectedAddress": "0x9d4c4455b12c23efe7169b317ed8af582a441dda"
+    },
+    {
+      "step": "6a",
+      "title": "funder wraps native PROS for the quote leg (only if WPROS was short)",
+      "from": "0x8ce84e9fa0101d317d8956d73610ad3e0e219d41",
+      "to": "0x52c48d4213107b20bc583832b0d951fb9ca8f0b0",
+      "kind": "CALL",
+      "payableValueWei": 11104848234201366,
+      "consumesDeployerNonce": 49,
+      "calldata": "0xd0e30db0",
+      "post": "cast call 0x52c48d4213107b20bc583832b0d951fb9ca8f0b0 'balanceOf(address)(uint256)' 0x8ce84e9fa0101d317d8956d73610ad3e0e219d41 -> >= 10095316576546696"
+    },
+    {
+      "step": "6b",
+      "title": "funder mints stPROS with native PROS (only if stPROS was short)",
+      "from": "0x8ce84e9fa0101d317d8956d73610ad3e0e219d41",
+      "to": "0x6b0a44c64190279f7034b77c13a566e914fe5ec4",
+      "kind": "CALL",
+      "payableValueWei": 11104848234201365,
+      "consumesDeployerNonce": 50,
+      "calldata": "0xb4430b99",
+      "note": "mints at the current oracle rate; 10% headroom covers rounding",
+      "post": "cast call 0x6b0a44c64190279f7034b77c13a566e914fe5ec4 'balanceOf(address)(uint256)' 0x8ce84e9fa0101d317d8956d73610ad3e0e219d41 -> >= 10000000000000000"
+    },
+    {
+      "step": 7,
+      "title": "funder approves exact amounts to the bootstrap (two txs)",
+      "from": "0x8ce84e9fa0101d317d8956d73610ad3e0e219d41",
+      "to": "0x6b0a44c64190279f7034b77c13a566e914fe5ec4",
+      "kind": "CALL",
+      "consumesDeployerNonce": 51,
+      "calldata": "0x095ea7b30000000000000000000000009d4c4455b12c23efe7169b317ed8af582a441dda000000000000000000000000000000000000000000000000002386f26fc10000",
+      "plus": {
+        "to": "0x52c48d4213107b20bc583832b0d951fb9ca8f0b0",
+        "consumesDeployerNonce": 52,
+        "calldata": "0x095ea7b30000000000000000000000009d4c4455b12c23efe7169b317ed8af582a441dda0000000000000000000000000000000000000000000000000023dda30e70af88"
+      }
+    },
+    {
+      "step": 8,
+      "title": "funder executes the atomic bootstrap",
+      "from": "0x8ce84e9fa0101d317d8956d73610ad3e0e219d41",
+      "to": "0x9d4c4455b12c23efe7169b317ed8af582a441dda",
+      "kind": "CALL",
+      "consumesDeployerNonce": 53,
+      "calldata": "0x61461954",
+      "note": "the pool must still be empty; pre-seeded/front-run pools are rejected before funds move",
+      "post": "cast call <pool> 'balanceOf(address)(uint256)' 0x3658e00f5ddb9fa0c7e9820e8d16c3c17eab73ca -> 9999999999998999"
+    },
+    {
+      "step": 9,
+      "title": "authorized executor: first on-chain sync verification (AC-20)",
+      "from": "<executor>",
+      "to": "0x7732fca644a733490ee90d648196bed8bf5871a3",
+      "calldata": "0x3f438fbb",
+      "note": "expected no-op right after creation (pool i == live rate); the PriceSynced path is exercised after the next oracle yield report"
+    }
+  ],
+  "rollback": "No single-step rollback exists once the pool is created and bound (GSP has no admin transfer). Before binding, a wrong pool can simply be abandoned (do not bind; recreate). After binding, i and priceLimit remain governable; funds are LP-owned by the Safe and exit via sellShares. The 0.01 bootstrap is the maximum exposure at risk in this package."
+}
