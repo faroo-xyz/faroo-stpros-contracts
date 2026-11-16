@@ -1,0 +1,100 @@
+{
+  "schema": "faroswap-mainnet-deployed-transactions-v1",
+  "network": "pharos-pacific-mainnet",
+  "chainId": 1672,
+  "ordering": "chronological by blockNumber",
+  "source": "RPC-verified receipts archived in faroo-contracts-reserch/faroswap/release-gate-20261116/",
+  "transactions": [
+    {
+      "step": "D1", "name": "deploy FaroSwapPriceManager implementation",
+      "hash": "0x32cfa56603f9d741b5b4781bc9415fd072162e57687e748dc30282b37f9ef644",
+      "from": "0x8ce84e9fa0101d317d8956d73610ad3e0e219d41", "nonce": 45,
+      "to": null, "creates": "0x167989ad7d2547f4477d53f01d4316b155ab4531",
+      "blockNumber": 23193554, "status": "success", "gasUsed": 2108485
+    },
+    {
+      "step": "D2", "name": "deploy ERC1967Proxy (Price Manager proxy, initialize -> Safe)",
+      "hash": "0x7ba2bdaa4b2f4c6059a0207a91f2c17f150bfc621987c0daa090e510c48fad72",
+      "from": "0x8ce84e9fa0101d317d8956d73610ad3e0e219d41", "nonce": 46,
+      "to": null, "creates": "0x7732fca644a733490ee90d648196bed8bf5871a3",
+      "blockNumber": 23194410, "status": "success", "gasUsed": 180030,
+      "event": "Upgraded(implementation)"
+    },
+    {
+      "step": "S1", "name": "Safe: setExecutor(confirmed sync executor, true)",
+      "hash": "0xa64f266b35ee92ef5bd9735b0237a88dac12c9c09b379d8dd82dac9c999df4f5",
+      "from": "0x4597c97a43dfbb4a398e2b16aa9ce61f90d801dd", "nonce": null,
+      "to": "0x3658e00f5ddb9fa0c7e9820e8d16c3c17eab73ca",
+      "via": "Safe execTransaction (3-of-5)",
+      "blockNumber": 23195126, "status": "success", "gasUsed": 107797,
+      "event": "ExecutorUpdated(0x677933905a31f13228e026d204f75f50d461b4d5, true) emitted by the proxy"
+    },
+    {
+      "step": "D3", "name": "create public GSP pool via GSPFactory",
+      "hash": "0xfcc3fa84be7440f89707c1c50e8200bda47031ec37b07ba000fb476318139fe4",
+      "from": "0x8ce84e9fa0101d317d8956d73610ad3e0e219d41", "nonce": 47,
+      "to": "0xd15f2d50bbf777efd529052686d0703e498f8380",
+      "creates": "0xa4b6f4dbe9c9d2036bb51ca27768aeefabcb4942",
+      "blockNumber": 23195832, "status": "success", "gasUsed": 441839,
+      "event": "NewGSP(base=stPROS, quote=WPROS, creator=deployer, GSP=0xa4b6...4942) — all four params non-indexed, in event data"
+    },
+    {
+      "step": "S2", "name": "Safe: bindPool (one-time binding)",
+      "hash": "0xe32d1dfec3b9274331c7fb8b719c9b782198bb180d7ef2df041fa62af6d017b7",
+      "from": "0x4597c97a43dfbb4a398e2b16aa9ce61f90d801dd", "nonce": null,
+      "to": "0x3658e00f5ddb9fa0c7e9820e8d16c3c17eab73ca",
+      "via": "Safe execTransaction (3-of-5)",
+      "blockNumber": 23196596, "status": "success", "gasUsed": 203527,
+      "event": "PoolBound(0xa4b6f4dbe9c9d2036bb51ca27768aeefabcb4942, 1010525183599656910) emitted by the proxy"
+    },
+    {
+      "step": "D4", "name": "deploy FaroSwapPoolBootstrap",
+      "hash": "0x24d0ce2ba71e0bcb626ead912e9f723dac755d269e2ba72a89621840cac49d0a",
+      "from": "0x8ce84e9fa0101d317d8956d73610ad3e0e219d41", "nonce": 48,
+      "to": null, "creates": "0x9d4c4455b12c23efe7169b317ed8af582a441dda",
+      "blockNumber": 23197493, "status": "success", "gasUsed": 738117
+    },
+    {
+      "step": "D5", "name": "deployer wraps native PROS (funding leg, 110% headroom)",
+      "hash": "0xdbb8ca67e2a924b1d849706fb35e21413cc2fb385961a8ef90d69b23e9d5d632",
+      "from": "0x8ce84e9fa0101d317d8956d73610ad3e0e219d41", "nonce": 49,
+      "to": "0x52c48d4213107b20bc583832b0d951fb9ca8f0b0",
+      "valueWei": 11115777019596226,
+      "blockNumber": 23197659, "status": "success", "gasUsed": 44942
+    },
+    {
+      "step": "D6", "name": "deployer mints stPROS with native PROS (funding leg, 110% headroom)",
+      "hash": "0x6a545fe26e0b78d7e1baea0e0f257e017459ef67bdc494c73c356fa662018b8e",
+      "from": "0x8ce84e9fa0101d317d8956d73610ad3e0e219d41", "nonce": 50,
+      "to": "0x6b0a44c64190279f7034b77c13a566e914fe5ec4",
+      "valueWei": 11115777019596226,
+      "blockNumber": 23197672, "status": "success", "gasUsed": 122202,
+      "event": "Deposit"
+    },
+    {
+      "step": "D7", "name": "approve exact stPROS to the bootstrap",
+      "hash": "0xf00849c309973f556e7c0a96e0399a9f85d7a9802f5df1b801ff5ca780f0afe5",
+      "from": "0x8ce84e9fa0101d317d8956d73610ad3e0e219d41", "nonce": 51,
+      "to": "0x6b0a44c64190279f7034b77c13a566e914fe5ec4",
+      "blockNumber": 23197689, "status": "success", "gasUsed": 53684,
+      "event": "Approval(stPROS -> bootstrap, 1e16)"
+    },
+    {
+      "step": "D8", "name": "approve exact WPROS to the bootstrap",
+      "hash": "0x544b7f4b85fc8ef9642ea8d77220ef23a6812d325902a699d859226d6ce40bd6",
+      "from": "0x8ce84e9fa0101d317d8956d73610ad3e0e219d41", "nonce": 52,
+      "to": "0x52c48d4213107b20bc583832b0d951fb9ca8f0b0",
+      "blockNumber": 23197705, "status": "success", "gasUsed": 46135,
+      "event": "Approval(WPROS -> bootstrap, 10105251835996569)"
+    },
+    {
+      "step": "D9", "name": "execute the atomic 0.01 bootstrap",
+      "hash": "0x2eb853a5f994f270d60c10d93df900a8bc5a76a44f2b44aec112ed8a5619694a",
+      "from": "0x8ce84e9fa0101d317d8956d73610ad3e0e219d41", "nonce": 53,
+      "to": "0x9d4c4455b12c23efe7169b317ed8af582a441dda",
+      "blockNumber": 23197739, "status": "success", "gasUsed": 290089,
+      "event": "Bootstrapped(pool=0xa4b6...4942, Safe, shares=9999999999998999, base=1e16, quote=10105251835996569)"
+    }
+  ],
+  "finalDeployerNonce": 54
+}

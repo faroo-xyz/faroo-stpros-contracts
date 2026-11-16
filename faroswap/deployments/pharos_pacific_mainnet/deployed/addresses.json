@@ -1,0 +1,39 @@
+{
+  "schema": "faroswap-mainnet-deployed-addresses-v1",
+  "network": "pharos-pacific-mainnet",
+  "chainId": 1672,
+  "frozenSourceCommit": "dc8fbd8a8f3a1f5e3d1fa09a0d84aaf9c67a9a6d",
+  "verifiedEvidence": {
+    "manifest": "faroo-contracts-reserch/faroswap/release-gate-20261116/deployment-mainnet-manifest.json",
+    "record": "faroo-contracts-reserch/faroswap/release-gate-20261116/MAINNET-DEPLOYMENT-RECORD.md",
+    "note": "all identities independently RPC-verified; see README.md for bytecode-identity vs public-verification distinction"
+  },
+  "priceManager": {
+    "operational": "0x7732fca644a733490ee90d648196bed8bf5871a3",
+    "operationalKind": "ERC1967Proxy (call the implementation ABI at this address)",
+    "implementation": "0x167989ad7d2547f4477d53f01d4316b155ab4531"
+  },
+  "pool": {
+    "gspPool": "0xa4b6f4dbe9c9d2036bb51ca27768aeefabcb4942",
+    "gspPoolKind": "EIP-1167 clone of the verified GSP 1.0.1 template",
+    "gspFactory": "0xd15f2d50bbf777efd529052686d0703e498f8380",
+    "gspTemplate": "0x81b04c62c53a716b7b5ce7fe8de42ab665bca935",
+    "bootstrapHelper": "0x9d4c4455b12c23efe7169b317ed8af582a441dda",
+    "bootstrapHelperState": "already executed (one-shot); historical artifact"
+  },
+  "tokens": {
+    "stPROS": "0x6b0a44c64190279f7034b77c13a566e914fe5ec4",
+    "WPROS": "0x52c48d4213107b20bc583832b0d951fb9ca8f0b0",
+    "oracle": "0x051713fd66845a13bf23baca008c5c22c27ccb58"
+  },
+  "governance": {
+    "governanceSafe": "0x3658e00f5ddb9fa0c7e9820e8d16c3c17eab73ca",
+    "role": "Price Manager business owner + upgrade authority + GSP LP recipient"
+  },
+  "operators": {
+    "syncExecutor": "0x677933905a31f13228e026d204f75f50d461b4d5",
+    "syncExecutorScope": "syncPrice() trigger only",
+    "deployer": "0x8ce84e9fa0101d317d8956d73610ad3e0e219d41",
+    "deployerScope": "deployment/funding account only; holds no Price Manager authority"
+  }
+}
